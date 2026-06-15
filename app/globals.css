@@ -1,26 +1,254 @@
-@import "tailwindcss";
-
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f4f7fb;
+  --ink: #132238;
+  --muted: #64748b;
+  --line: #dbe4f0;
+  --blue: #315dff;
+  --card: #ffffff;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(49, 93, 255, 0.14), transparent 28%),
+    linear-gradient(180deg, #f9fbff, var(--bg));
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.hero {
+  border-radius: 30px;
+  padding: 28px;
+  color: white;
+  background: linear-gradient(135deg, #101d3d, #1e3c8d 55%, #315dff);
+  box-shadow: 0 18px 45px rgba(19, 34, 56, 0.13);
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+  margin: 0 0 8px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(32px, 6vw, 54px);
+  line-height: 1;
+}
+
+.hero p:last-child {
+  margin-top: 12px;
+  max-width: 760px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 17px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.metrics div {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow: 0 12px 32px rgba(19, 34, 56, 0.08);
+}
+
+.metrics span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.metrics strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 26px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 18px;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  padding: 20px;
+  box-shadow: 0 18px 45px rgba(19, 34, 56, 0.09);
+}
+
+.muted {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.searchRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin: 14px 0 24px;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 13px 14px;
+  outline: none;
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+button {
+  border: 0;
+  border-radius: 16px;
+  padding: 13px 16px;
+  background: #eef4ff;
+  color: #203b70;
+  font-weight: 800;
+}
+
+.searchRow button,
+.buttonGrid button:first-child {
+  color: white;
+  background: linear-gradient(135deg, #315dff, #6b7cff);
+}
+
+.contacts {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.contact {
+  width: 100%;
+  display: flex;
+  text-align: left;
+  gap: 12px;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px;
+  color: var(--ink);
+}
+
+.contact.active {
+  background: #f8fbff;
+  border-color: rgba(49, 93, 255, 0.45);
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  color: #233b70;
+  background: #e8efff;
+  flex: 0 0 auto;
+}
+
+.contact span,
+.contact small {
+  display: block;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.pillRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+
+.pillRow span {
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #203b70;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.capture {
+  display: grid;
+  gap: 10px;
+}
+
+.buttonGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.sections {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.item {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  background: white;
+}
+
+@media (max-width: 850px) {
+  .metrics,
+  .grid,
+  .buttonGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .searchRow {
+    grid-template-columns: 1fr;
+  }
+
+  .app {
+    padding: 12px;
+  }
 }

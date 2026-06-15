@@ -1,65 +1,248 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+
+type Contact = {
+  id: string;
+  name: string;
+  company: string;
+  title: string;
+  owner: string;
+  source: string;
+  notes: string[];
+  followups: string[];
+  tags: string[];
+};
+
+const starterContacts: Contact[] = [
+  {
+    id: "1",
+    name: "Jane Smith",
+    company: "Netflix",
+    title: "VP, Partnerships",
+    owner: "Clarke Johnson",
+    source: "Salesforce synced",
+    notes: [
+      "Interested in attention measurement.",
+      "Asked for case study after Cannes."
+    ],
+    followups: ["Send attention case study"],
+    tags: ["@Clarke"]
+  },
+  {
+    id: "2",
+    name: "Mike Jones",
+    company: "GroupM",
+    title: "SVP, Media",
+    owner: "Aurelio Farrell",
+    source: "Salesforce synced",
+    notes: ["Mentioned possible Q4 RFP."],
+    followups: ["Send capabilities email"],
+    tags: ["@Aurelio"]
+  }
+];
 
 export default function Home() {
+  const [contacts, setContacts] = useState<Contact[]>(starterContacts);
+  const [selectedId, setSelectedId] = useState("1");
+  const [search, setSearch] = useState("");
+  const [note, setNote] = useState("");
+
+  const selected = contacts.find((c) => c.id === selectedId) || contacts[0];
+
+  function addMockSalesforceContact() {
+    const newContact: Contact = {
+      id: String(Date.now()),
+      name: search || "Sarah Lee",
+      company: "Nike",
+      title: "Director, Brand Media",
+      owner: "Dani Halle",
+      source: "Mock Salesforce lookup",
+      notes: ["Added from Salesforce read-only search."],
+      followups: [],
+      tags: []
+    };
+
+    setContacts([newContact, ...contacts]);
+    setSelectedId(newContact.id);
+    setSearch("");
+  }
+
+  function saveNote() {
+    if (!note.trim()) return;
+
+    setContacts(
+      contacts.map((contact) =>
+        contact.id === selected.id
+          ? { ...contact, notes: [note, ...contact.notes] }
+          : contact
+      )
+    );
+
+    setNote("");
+  }
+
+  function addFollowup() {
+    setContacts(
+      contacts.map((contact) =>
+        contact.id === selected.id
+          ? {
+              ...contact,
+              followups: [`Follow up with ${selected.name}`, ...contact.followups]
+            }
+          : contact
+      )
+    );
+  }
+
+  function tagAurelio() {
+    setContacts(
+      contacts.map((contact) =>
+        contact.id === selected.id
+          ? { ...contact, tags: ["@Aurelio", ...contact.tags] }
+          : contact
+      )
+    );
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="app">
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Kargo Internal Prototype</p>
+          <h1>Kargo Event Hub</h1>
+          <p>
+            A mobile-first networking layer on top of Salesforce for events,
+            notes, follow-ups, Granola context, and teammate tagging.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      <section className="metrics">
+        <div>
+          <span>Event</span>
+          <strong>Cannes Lions 2027</strong>
         </div>
-      </main>
-    </div>
+        <div>
+          <span>Contacts</span>
+          <strong>{contacts.length}</strong>
+        </div>
+        <div>
+          <span>Follow-ups</span>
+          <strong>{contacts.reduce((sum, c) => sum + c.followups.length, 0)}</strong>
+        </div>
+        <div>
+          <span>Tags</span>
+          <strong>{contacts.reduce((sum, c) => sum + c.tags.length, 0)}</strong>
+        </div>
+      </section>
+
+      <div className="grid">
+        <section className="panel">
+          <h2>Salesforce read-only search</h2>
+          <p className="muted">
+            This is mocked for now. Later this search box will call a Vercel API
+            route that reads from Salesforce.
+          </p>
+
+          <div className="searchRow">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search contact or account"
+            />
+            <button onClick={addMockSalesforceContact}>Attach</button>
+          </div>
+
+          <h2>Event contacts</h2>
+
+          <div className="contacts">
+            {contacts.map((contact) => (
+              <button
+                key={contact.id}
+                className={contact.id === selected.id ? "contact active" : "contact"}
+                onClick={() => setSelectedId(contact.id)}
+              >
+                <div className="avatar">
+                  {contact.name
+                    .split(" ")
+                    .map((x) => x[0])
+                    .slice(0, 2)
+                    .join("")}
+                </div>
+                <div>
+                  <strong>{contact.name}</strong>
+                  <span>
+                    {contact.company} · {contact.title}
+                  </span>
+                  <small>{contact.source}</small>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel">
+          <h2>{selected.name}</h2>
+          <p className="muted">
+            {selected.company} · {selected.title}
+          </p>
+
+          <div className="pillRow">
+            <span>{selected.source}</span>
+            <span>Owner: {selected.owner}</span>
+          </div>
+
+          <div className="capture">
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Add event note..."
+            />
+            <div className="buttonGrid">
+              <button onClick={saveNote}>Save note</button>
+              <button onClick={addFollowup}>Add follow-up</button>
+              <button onClick={tagAurelio}>Tag @Aurelio</button>
+              <button
+                onClick={() =>
+                  alert("Granola import placeholder. V1 can use paste/link import.")
+                }
+              >
+                Import Granola
+              </button>
+            </div>
+          </div>
+
+          <div className="sections">
+            <div>
+              <h3>Notes</h3>
+              {selected.notes.map((item, index) => (
+                <p key={index} className="item">
+                  {item}
+                </p>
+              ))}
+            </div>
+
+            <div>
+              <h3>Follow-ups</h3>
+              {selected.followups.map((item, index) => (
+                <p key={index} className="item">
+                  {item}
+                </p>
+              ))}
+            </div>
+
+            <div>
+              <h3>Team tags</h3>
+              {selected.tags.map((item, index) => (
+                <p key={index} className="item">
+                  {item}
+                </p>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }
