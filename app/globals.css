@@ -300,3 +300,154 @@ select {
     grid-template-columns: 1fr;
   }
 }
+.userBar {
+  margin-top: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 14px;
+}
+
+.userBar span {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.userBar button {
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+}
+
+.secondaryMetrics {
+  margin-top: -4px;
+}
+
+.secondaryMetrics div {
+  background: #f8fbff;
+}
+
+.secondaryMetrics strong {
+  font-size: 20px;
+}
+
+.contactStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 11px;
+  margin: 16px 0;
+}
+
+.contactStats div {
+  border: 1px solid var(--line);
+  background: #f8fbff;
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.contactStats span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.contactStats strong {
+  display: block;
+  font-size: 24px;
+  margin-top: 5px;
+}
+
+.tagBox {
+  border: 1px solid var(--line);
+  background: #f8fbff;
+  border-radius: 20px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.tagBoxHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.tagBoxHeader p {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.tagBoxHeader button {
+  padding: 9px 11px;
+  white-space: nowrap;
+}
+
+.repOptions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+}
+
+.repOption {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 16px;
+  padding: 11px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+
+.repOption input {
+  width: auto;
+}
+
+.repOption span {
+  display: grid;
+}
+
+.repOption small {
+  color: var(--muted);
+}
+
+.item small {
+  display: block;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.relationshipList {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.relationshipRow {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.relationshipRow span {
+  display: block;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+@media (max-width: 850px) {
+  .userBar,
+  .tagBoxHeader {
+    flex-direction: column;
+  }
+
+  .contactStats,
+  .repOptions {
+    grid-template-columns: 1fr;
+  }
+}
