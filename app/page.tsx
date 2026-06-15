@@ -224,7 +224,7 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState("contact-jane");
   const [search, setSearch] = useState("");
   const [captureText, setCaptureText] = useState("");
-  const [selectedTagUserIds, setSelectedTagUserIds] = useState<string[]>([]);
+  const [selectedTagUserId, setSelectedTagUserId] = useState("none");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
@@ -250,6 +250,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!hasLoadedStorage) return;
+
     window.localStorage.setItem(
       "kargo-event-hub-contacts",
       JSON.stringify(contacts)
@@ -403,43 +404,35 @@ export default function Home() {
     });
   }
 
-  function toggleTagUser(userId: string) {
-    setSelectedTagUserIds((current) =>
-      current.includes(userId)
-        ? current.filter((id) => id !== userId)
-        : [...current, userId]
-    );
-  }
-
-  function clearTagUsers() {
-    setSelectedTagUserIds([]);
-  }
-
-  function tagSelectedTeammates() {
-    if (selectedTagUserIds.length === 0) {
-      alert("No teammates selected. That is okay for a 1:1 meeting.");
+  function tagSelectedTeammate() {
+    if (selectedTagUserId === "none") {
+      alert("No teammate selected. This is fine for a 1:1 meeting.");
       return;
     }
 
-    const existingTaggedIds = new Set(
-      selected.tags.map((tag) => tag.taggedUserId)
+    const alreadyTagged = selected.tags.some(
+      (tag) => tag.taggedUserId === selectedTagUserId
     );
 
-    const newTags: TeammateTag[] = selectedTagUserIds
-      .filter((userId) => !existingTaggedIds.has(userId))
-      .map((userId) => ({
-        id: `${Date.now()}-${userId}`,
-        taggedUserId: userId,
-        taggedByUserId: currentUser.id,
-        createdAt: nowLabel(),
-      }));
+    if (alreadyTagged) {
+      alert("This teammate is already tagged on this contact.");
+      return;
+    }
 
     updateSelectedContact({
       ...selected,
-      tags: [...newTags, ...selected.tags],
+      tags: [
+        {
+          id: `${Date.now()}-${selectedTagUserId}`,
+          taggedUserId: selectedTagUserId,
+          taggedByUserId: currentUser.id,
+          createdAt: nowLabel(),
+        },
+        ...selected.tags,
+      ],
     });
 
-    setSelectedTagUserIds([]);
+    setSelectedTagUserId("none");
   }
 
   function deleteTag(tagId: string) {
@@ -475,7 +468,7 @@ export default function Home() {
     window.localStorage.removeItem("kargo-event-hub-contacts");
     setContacts(starterContacts);
     setSelectedId("contact-jane");
-    setSelectedTagUserIds([]);
+    setSelectedTagUserId("none");
   }
 
   return (
@@ -526,11 +519,11 @@ export default function Home() {
           <strong>{myContacts.length}</strong>
         </div>
         <div>
-          <span>Jane follow-ups</span>
+          <span>Selected contact follow-ups</span>
           <strong>{selected?.followups.length || 0}</strong>
         </div>
         <div>
-          <span>Jane teammate tags</span>
+          <span>Selected contact tags</span>
           <strong>{selected?.tags.length || 0}</strong>
         </div>
         <div>
@@ -597,7 +590,9 @@ export default function Home() {
           <div className="pillRow">
             <span>{selected.source}</span>
             <span>Added by: {getUserName(selected.addedByUserId)}</span>
-            <span>Account owner: {getUserName(selected.accountOwnerUserId)}</span>
+            <span>
+              Account owner: {getUserName(selected.accountOwnerUserId)}
+            </span>
           </div>
 
           <div className="contactStats">
@@ -625,38 +620,31 @@ export default function Home() {
             <div className="tagBox">
               <div className="tagBoxHeader">
                 <div>
-                  <strong>Tag active sales reps</strong>
+                  <strong>Tag active sales rep</strong>
                   <p>
-                    Select none for a 1:1 meeting, or choose multiple reps who
-                    should be looped in.
+                    Choose one rep to loop in, or leave as none for a 1:1
+                    meeting.
                   </p>
                 </div>
-                <button onClick={clearTagUsers}>None / clear</button>
               </div>
 
-              <div className="repOptions">
-                {activeSalesReps
-                  .filter((rep) => rep.active)
-                  .map((rep) => (
-                    <label key={rep.id} className="repOption">
-                      <input
-                        type="checkbox"
-                        checked={selectedTagUserIds.includes(rep.id)}
-                        onChange={() => toggleTagUser(rep.id)}
-                      />
-                      <span>
-                        <strong>{rep.name}</strong>
-                        <small>
-                          {rep.role} · {rep.region}
-                        </small>
-                      </span>
-                    </label>
-                  ))}
-              </div>
+              <div className="tagDropdownRow">
+                <select
+                  value={selectedTagUserId}
+                  onChange={(e) => setSelectedTagUserId(e.target.value)}
+                >
+                  <option value="none">None / 1:1 meeting</option>
+                  {activeSalesReps
+                    .filter((rep) => rep.active)
+                    .map((rep) => (
+                      <option key={rep.id} value={rep.id}>
+                        {rep.name} — {rep.role} · {rep.region}
+                      </option>
+                    ))}
+                </select>
 
-              <button onClick={tagSelectedTeammates}>
-                Add selected teammate tags
-              </button>
+                <button onClick={tagSelectedTeammate}>Add teammate tag</button>
+              </div>
             </div>
 
             <div className="buttonGrid">

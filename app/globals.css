@@ -451,3 +451,14 @@ select {
     grid-template-columns: 1fr;
   }
 }
+.tagDropdownRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+@media (max-width: 850px) {
+  .tagDropdownRow {
+    grid-template-columns: 1fr;
+  }
+}
