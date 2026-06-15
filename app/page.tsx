@@ -2,6 +2,21 @@
 
 import { useState } from "react";
 
+type Note = {
+  id: string;
+  text: string;
+};
+
+type Followup = {
+  id: string;
+  text: string;
+};
+
+type Tag = {
+  id: string;
+  person: string;
+};
+
 type Contact = {
   id: string;
   name: string;
@@ -9,9 +24,9 @@ type Contact = {
   title: string;
   owner: string;
   source: string;
-  notes: string[];
-  followups: string[];
-  tags: string[];
+  notes: Note[];
+  followups: Followup[];
+  tags: Tag[];
 };
 
 const starterContacts: Contact[] = [
@@ -23,11 +38,27 @@ const starterContacts: Contact[] = [
     owner: "Clarke Johnson",
     source: "Salesforce synced",
     notes: [
-      "Interested in attention measurement.",
-      "Asked for case study after Cannes."
+      {
+        id: "n1",
+        text: "Interested in attention measurement.",
+      },
+      {
+        id: "n2",
+        text: "Asked for case study after Cannes.",
+      },
     ],
-    followups: ["Send attention case study"],
-    tags: ["@Clarke"]
+    followups: [
+      {
+        id: "f1",
+        text: "Send attention case study",
+      },
+    ],
+    tags: [
+      {
+        id: "t1",
+        person: "@Clarke",
+      },
+    ],
   },
   {
     id: "2",
@@ -36,19 +67,55 @@ const starterContacts: Contact[] = [
     title: "SVP, Media",
     owner: "Aurelio Farrell",
     source: "Salesforce synced",
-    notes: ["Mentioned possible Q4 RFP."],
-    followups: ["Send capabilities email"],
-    tags: ["@Aurelio"]
-  }
+    notes: [
+      {
+        id: "n3",
+        text: "Mentioned possible Q4 RFP.",
+      },
+    ],
+    followups: [
+      {
+        id: "f2",
+        text: "Send capabilities email",
+      },
+    ],
+    tags: [
+      {
+        id: "t2",
+        person: "@Aurelio",
+      },
+    ],
+  },
 ];
 
 export default function Home() {
   const [contacts, setContacts] = useState<Contact[]>(starterContacts);
   const [selectedId, setSelectedId] = useState("1");
   const [search, setSearch] = useState("");
-  const [note, setNote] = useState("");
+  const [captureText, setCaptureText] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState("");
+  const [selectedTag, setSelectedTag] = useState("@Aurelio");
 
   const selected = contacts.find((c) => c.id === selectedId) || contacts[0];
+
+  const totalFollowups = contacts.reduce(
+    (sum, contact) => sum + contact.followups.length,
+    0
+  );
+
+  const totalTags = contacts.reduce(
+    (sum, contact) => sum + contact.tags.length,
+    0
+  );
+
+  function updateSelectedContact(updatedContact: Contact) {
+    setContacts(
+      contacts.map((contact) =>
+        contact.id === updatedContact.id ? updatedContact : contact
+      )
+    );
+  }
 
   function addMockSalesforceContact() {
     const newContact: Contact = {
@@ -58,9 +125,14 @@ export default function Home() {
       title: "Director, Brand Media",
       owner: "Dani Halle",
       source: "Mock Salesforce lookup",
-      notes: ["Added from Salesforce read-only search."],
+      notes: [
+        {
+          id: String(Date.now()) + "-note",
+          text: "Added from Salesforce read-only search.",
+        },
+      ],
       followups: [],
-      tags: []
+      tags: [],
     };
 
     setContacts([newContact, ...contacts]);
@@ -69,40 +141,114 @@ export default function Home() {
   }
 
   function saveNote() {
-    if (!note.trim()) return;
+    if (!captureText.trim()) return;
 
-    setContacts(
-      contacts.map((contact) =>
-        contact.id === selected.id
-          ? { ...contact, notes: [note, ...contact.notes] }
-          : contact
-      )
-    );
+    updateSelectedContact({
+      ...selected,
+      notes: [
+        {
+          id: String(Date.now()),
+          text: captureText.trim(),
+        },
+        ...selected.notes,
+      ],
+    });
 
-    setNote("");
+    setCaptureText("");
   }
 
   function addFollowup() {
-    setContacts(
-      contacts.map((contact) =>
-        contact.id === selected.id
-          ? {
-              ...contact,
-              followups: [`Follow up with ${selected.name}`, ...contact.followups]
-            }
-          : contact
-      )
-    );
+    if (!captureText.trim()) {
+      alert("Write the follow-up in the text box first.");
+      return;
+    }
+
+    updateSelectedContact({
+      ...selected,
+      followups: [
+        {
+          id: String(Date.now()),
+          text: captureText.trim(),
+        },
+        ...selected.followups,
+      ],
+    });
+
+    setCaptureText("");
   }
 
-  function tagAurelio() {
-    setContacts(
-      contacts.map((contact) =>
-        contact.id === selected.id
-          ? { ...contact, tags: ["@Aurelio", ...contact.tags] }
-          : contact
-      )
-    );
+  function deleteNote(noteId: string) {
+    updateSelectedContact({
+      ...selected,
+      notes: selected.notes.filter((note) => note.id !== noteId),
+    });
+  }
+
+  function startEditingNote(note: Note) {
+    setEditingNoteId(note.id);
+    setEditingNoteText(note.text);
+  }
+
+  function saveEditedNote() {
+    if (!editingNoteId) return;
+
+    updateSelectedContact({
+      ...selected,
+      notes: selected.notes.map((note) =>
+        note.id === editingNoteId
+          ? {
+              ...note,
+              text: editingNoteText,
+            }
+          : note
+      ),
+    });
+
+    setEditingNoteId(null);
+    setEditingNoteText("");
+  }
+
+  function deleteFollowup(followupId: string) {
+    updateSelectedContact({
+      ...selected,
+      followups: selected.followups.filter(
+        (followup) => followup.id !== followupId
+      ),
+    });
+  }
+
+  function tagRep() {
+    updateSelectedContact({
+      ...selected,
+      tags: [
+        {
+          id: String(Date.now()),
+          person: selectedTag,
+        },
+        ...selected.tags,
+      ],
+    });
+  }
+
+  function deleteTag(tagId: string) {
+    updateSelectedContact({
+      ...selected,
+      tags: selected.tags.filter((tag) => tag.id !== tagId),
+    });
+  }
+
+  function importGranola() {
+    updateSelectedContact({
+      ...selected,
+      notes: [
+        {
+          id: String(Date.now()),
+          text:
+            "Granola import placeholder: paste or link meeting notes here in V1.",
+        },
+        ...selected.notes,
+      ],
+    });
   }
 
   return (
@@ -129,11 +275,11 @@ export default function Home() {
         </div>
         <div>
           <span>Follow-ups</span>
-          <strong>{contacts.reduce((sum, c) => sum + c.followups.length, 0)}</strong>
+          <strong>{totalFollowups}</strong>
         </div>
         <div>
           <span>Tags</span>
-          <strong>{contacts.reduce((sum, c) => sum + c.tags.length, 0)}</strong>
+          <strong>{totalTags}</strong>
         </div>
       </section>
 
@@ -160,7 +306,9 @@ export default function Home() {
             {contacts.map((contact) => (
               <button
                 key={contact.id}
-                className={contact.id === selected.id ? "contact active" : "contact"}
+                className={
+                  contact.id === selected.id ? "contact active" : "contact"
+                }
                 onClick={() => setSelectedId(contact.id)}
               >
                 <div className="avatar">
@@ -195,49 +343,100 @@ export default function Home() {
 
           <div className="capture">
             <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Add event note..."
+              value={captureText}
+              onChange={(e) => setCaptureText(e.target.value)}
+              placeholder="Write a note or follow-up here..."
             />
-            <div className="buttonGrid">
-              <button onClick={saveNote}>Save note</button>
-              <button onClick={addFollowup}>Add follow-up</button>
-              <button onClick={tagAurelio}>Tag @Aurelio</button>
-              <button
-                onClick={() =>
-                  alert("Granola import placeholder. V1 can use paste/link import.")
-                }
+
+            <div className="tagRow">
+              <select
+                value={selectedTag}
+                onChange={(e) => setSelectedTag(e.target.value)}
               >
-                Import Granola
-              </button>
+                <option>@Aurelio</option>
+                <option>@Clarke</option>
+                <option>@Dani</option>
+                <option>@Jerry</option>
+                <option>@Naina</option>
+              </select>
+              <button onClick={tagRep}>Tag teammate</button>
+            </div>
+
+            <div className="buttonGrid">
+              <button onClick={saveNote}>Save as note</button>
+              <button onClick={addFollowup}>Save as follow-up</button>
+              <button onClick={importGranola}>Import Granola</button>
             </div>
           </div>
 
           <div className="sections">
             <div>
               <h3>Notes</h3>
-              {selected.notes.map((item, index) => (
-                <p key={index} className="item">
-                  {item}
-                </p>
+              {selected.notes.length === 0 && (
+                <p className="empty">No notes yet.</p>
+              )}
+
+              {selected.notes.map((note) => (
+                <div key={note.id} className="item">
+                  {editingNoteId === note.id ? (
+                    <>
+                      <textarea
+                        value={editingNoteText}
+                        onChange={(e) => setEditingNoteText(e.target.value)}
+                      />
+                      <div className="miniActions">
+                        <button onClick={saveEditedNote}>Save edit</button>
+                        <button onClick={() => setEditingNoteId(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p>{note.text}</p>
+                      <div className="miniActions">
+                        <button onClick={() => startEditingNote(note)}>
+                          Edit
+                        </button>
+                        <button onClick={() => deleteNote(note.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               ))}
             </div>
 
             <div>
               <h3>Follow-ups</h3>
-              {selected.followups.map((item, index) => (
-                <p key={index} className="item">
-                  {item}
-                </p>
+              {selected.followups.length === 0 && (
+                <p className="empty">No follow-ups yet.</p>
+              )}
+
+              {selected.followups.map((followup) => (
+                <div key={followup.id} className="item">
+                  <p>{followup.text}</p>
+                  <div className="miniActions">
+                    <button onClick={() => deleteFollowup(followup.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
 
             <div>
               <h3>Team tags</h3>
-              {selected.tags.map((item, index) => (
-                <p key={index} className="item">
-                  {item}
-                </p>
+              {selected.tags.length === 0 && (
+                <p className="empty">No teammate tags yet.</p>
+              )}
+
+              {selected.tags.map((tag) => (
+                <div key={tag.id} className="item tagItem">
+                  <p>{tag.person}</p>
+                  <button onClick={() => deleteTag(tag.id)}>Delete</button>
+                </div>
               ))}
             </div>
           </div>

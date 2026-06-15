@@ -252,3 +252,51 @@ button {
     padding: 12px;
   }
 }
+.tagRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 13px 14px;
+  outline: none;
+  font: inherit;
+  color: var(--ink);
+  background: white;
+}
+
+.miniActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.miniActions button,
+.tagItem button {
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.empty {
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.tagItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 850px) {
+  .tagRow {
+    grid-template-columns: 1fr;
+  }
+}
