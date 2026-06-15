@@ -38,11 +38,15 @@ type TeammateTag = {
 
 type Contact = {
   id: string;
+  eventId: string;
+  eventName: string;
   salesforceContactId?: string;
   name: string;
   company: string;
   title: string;
   accountOwnerUserId: string;
+  accountOwnerName?: string;
+  accountOwnerEmail?: string;
   source: string;
   addedByUserId: string;
   addedAt: string;
@@ -55,12 +59,30 @@ type SalesforceSearchResult = {
   salesforceContactId: string;
   salesforceAccountId: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   title: string;
   company: string;
+  accountOwnerName?: string;
+  accountOwnerEmail?: string;
   accountOwnerUserId: string;
   contactOwnerUserId: string;
   source: string;
+};
+
+type EventWorkspace = {
+  id: string;
+  name: string;
+  region: string;
+  type: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  active: boolean;
+  owner: string;
+  createdDate: string;
+  lastModifiedDate: string;
 };
 
 const currentUser: UserProfile = {
@@ -135,80 +157,6 @@ const activeSalesReps: UserProfile[] = [
 
 const allUsers = [currentUser, ...activeSalesReps];
 
-const starterContacts: Contact[] = [
-  {
-    id: "contact-jane",
-    salesforceContactId: "003-jane-placeholder",
-    name: "Jane Smith",
-    company: "Netflix",
-    title: "VP, Partnerships",
-    accountOwnerUserId: "user-clarke",
-    source: "Salesforce synced",
-    addedByUserId: "user-prajay",
-    addedAt: "Prototype seed",
-    notes: [
-      {
-        id: "note-1",
-        text: "Interested in attention measurement.",
-        createdByUserId: "user-prajay",
-        createdAt: "Prototype seed",
-      },
-      {
-        id: "note-2",
-        text: "Asked for case study after Cannes.",
-        createdByUserId: "user-prajay",
-        createdAt: "Prototype seed",
-      },
-    ],
-    followups: [
-      {
-        id: "followup-1",
-        text: "Send attention case study",
-        createdByUserId: "user-prajay",
-        assignedToUserId: "user-prajay",
-        createdAt: "Prototype seed",
-      },
-    ],
-    tags: [
-      {
-        id: "tag-1",
-        taggedUserId: "user-clarke",
-        taggedByUserId: "user-prajay",
-        createdAt: "Prototype seed",
-      },
-    ],
-  },
-  {
-    id: "contact-mike",
-    salesforceContactId: "003-mike-placeholder",
-    name: "Mike Jones",
-    company: "GroupM",
-    title: "SVP, Media",
-    accountOwnerUserId: "user-aurelio",
-    source: "Salesforce synced",
-    addedByUserId: "user-prajay",
-    addedAt: "Prototype seed",
-    notes: [
-      {
-        id: "note-3",
-        text: "Mentioned possible Q4 RFP.",
-        createdByUserId: "user-prajay",
-        createdAt: "Prototype seed",
-      },
-    ],
-    followups: [
-      {
-        id: "followup-2",
-        text: "Send capabilities email",
-        createdByUserId: "user-prajay",
-        assignedToUserId: "user-prajay",
-        createdAt: "Prototype seed",
-      },
-    ],
-    tags: [],
-  },
-];
-
 function getUserName(userId: string) {
   return allUsers.find((user) => user.id === userId)?.name || "Unknown user";
 }
@@ -232,18 +180,23 @@ function nowLabel() {
 }
 
 export default function Home() {
-  const [contacts, setContacts] = useState<Contact[]>(starterContacts);
-  const [selectedId, setSelectedId] = useState("contact-jane");
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
   const [salesforceResults, setSalesforceResults] = useState<
-  SalesforceSearchResult[]
->([]);
+    SalesforceSearchResult[]
+  >([]);
   const [isSearchingSalesforce, setIsSearchingSalesforce] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [selectedTagUserId, setSelectedTagUserId] = useState("none");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
+
+  const [events, setEvents] = useState<EventWorkspace[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState("");
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [eventsError, setEventsError] = useState("");
 
   useEffect(() => {
     const saved = window.localStorage.getItem("kargo-event-hub-contacts");
@@ -257,7 +210,7 @@ export default function Home() {
           setSelectedId(parsedContacts[0].id);
         }
       } catch {
-        setContacts(starterContacts);
+        setContacts([]);
       }
     }
 
@@ -273,26 +226,78 @@ export default function Home() {
     );
   }, [contacts, hasLoadedStorage]);
 
+  useEffect(() => {
+    async function loadEvents() {
+      setIsLoadingEvents(true);
+      setEventsError("");
+
+      try {
+        const response = await fetch("/api/events");
+
+        if (!response.ok) {
+          throw new Error(`Events request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const eventResults = data.results || [];
+
+        setEvents(eventResults);
+
+        if (eventResults.length > 0) {
+          setSelectedEventId(eventResults[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to load events:", error);
+        setEventsError("Could not load events from the private Sheet.");
+      } finally {
+        setIsLoadingEvents(false);
+      }
+    }
+
+    loadEvents();
+  }, []);
+
+  const selectedEvent =
+    events.find((event) => event.id === selectedEventId) || events[0] || null;
+
+  const eventContacts = selectedEvent
+    ? contacts.filter((contact) => contact.eventId === selectedEvent.id)
+    : [];
+
   const selected = useMemo(
-    () => contacts.find((contact) => contact.id === selectedId) || contacts[0],
-    [contacts, selectedId]
+    () =>
+      eventContacts.find((contact) => contact.id === selectedId) ||
+      eventContacts[0],
+    [eventContacts, selectedId]
   );
 
-  const eventFollowups = contacts.reduce(
+  useEffect(() => {
+    if (!selectedEvent) return;
+
+    if (!eventContacts.some((contact) => contact.id === selectedId)) {
+      setSelectedId(eventContacts[0]?.id || "");
+    }
+  }, [selectedEventId, contacts, selectedEvent, eventContacts, selectedId]);
+
+  const eventFollowups = eventContacts.reduce(
     (sum, contact) => sum + contact.followups.length,
     0
   );
 
-  const eventTags = contacts.reduce(
+  const eventTags = eventContacts.reduce(
     (sum, contact) => sum + contact.tags.length,
     0
   );
 
-  const myContacts = contacts.filter(
+  const uniqueAccounts = new Set(
+    eventContacts.map((contact) => contact.company).filter(Boolean)
+  ).size;
+
+  const myContacts = eventContacts.filter(
     (contact) => contact.addedByUserId === currentUser.id
   );
 
-  const contactsAddedByUser = contacts.reduce<Record<string, number>>(
+  const contactsAddedByUser = eventContacts.reduce<Record<string, number>>(
     (acc, contact) => {
       acc[contact.addedByUserId] = (acc[contact.addedByUserId] || 0) + 1;
       return acc;
@@ -308,56 +313,107 @@ export default function Home() {
     );
   }
 
-async function searchSalesforce() {
-  setIsSearchingSalesforce(true);
+  async function searchSalesforce() {
+    setIsSearchingSalesforce(true);
 
-  try {
-    const response = await fetch(
-      `/api/salesforce/search?q=${encodeURIComponent(search)}`
+    try {
+      const response = await fetch(
+        `/api/salesforce/search?q=${encodeURIComponent(search)}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Salesforce search failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setSalesforceResults(data.results || []);
+    } catch (error) {
+      console.error("Salesforce search failed:", error);
+      alert("Salesforce Sheet search failed.");
+    } finally {
+      setIsSearchingSalesforce(false);
+    }
+  }
+
+  function attachSalesforceContact(result: SalesforceSearchResult) {
+    if (!selectedEvent) {
+      alert("Choose an event before attaching a contact.");
+      return;
+    }
+
+    const alreadyAttached = eventContacts.some(
+      (contact) => contact.salesforceContactId === result.salesforceContactId
     );
 
-    const data = await response.json();
-    setSalesforceResults(data.results || []);
-  } catch {
-    alert("Salesforce mock search failed.");
-  } finally {
-    setIsSearchingSalesforce(false);
+    if (alreadyAttached) {
+      alert("This Salesforce contact is already attached to this event.");
+      return;
+    }
+
+    const newContact: Contact = {
+      id: String(Date.now()),
+      eventId: selectedEvent.id,
+      eventName: selectedEvent.name,
+      salesforceContactId: result.salesforceContactId,
+      name: result.name,
+      company: result.company,
+      title: result.title,
+      accountOwnerUserId: result.accountOwnerUserId,
+      accountOwnerName: result.accountOwnerName,
+      accountOwnerEmail: result.accountOwnerEmail,
+      source: result.source,
+      addedByUserId: currentUser.id,
+      addedAt: nowLabel(),
+      notes: [
+        {
+          id: `${Date.now()}-source-note`,
+          text: `Attached to ${selectedEvent.name} from private Salesforce Sheet. Email: ${
+            result.email || "N/A"
+          }. Account owner: ${result.accountOwnerName || "N/A"}${
+            result.accountOwnerEmail ? ` (${result.accountOwnerEmail})` : ""
+          }.`,
+          createdByUserId: currentUser.id,
+          createdAt: nowLabel(),
+        },
+      ],
+      followups: [],
+      tags: [],
+    };
+
+    setContacts([newContact, ...contacts]);
+    setSelectedId(newContact.id);
+    setSearch("");
+    setSalesforceResults([]);
   }
-}
 
-function attachSalesforceContact(result: SalesforceSearchResult) {
-  const alreadyAttached = contacts.some(
-    (contact) => contact.salesforceContactId === result.salesforceContactId
-  );
+  function removeEventContact(contactId: string) {
+    const contactToRemove = contacts.find((contact) => contact.id === contactId);
 
-  if (alreadyAttached) {
-    alert("This Salesforce contact is already attached to the event.");
-    return;
+    if (!contactToRemove) return;
+
+    const confirmRemove = window.confirm(
+      `Remove ${contactToRemove.name} from ${contactToRemove.eventName}? This will also remove their notes, follow-ups, and teammate tags from this prototype.`
+    );
+
+    if (!confirmRemove) return;
+
+    const remainingContacts = contacts.filter(
+      (contact) => contact.id !== contactId
+    );
+
+    setContacts(remainingContacts);
+
+    if (selectedId === contactId && selectedEvent) {
+      const remainingEventContacts = remainingContacts.filter(
+        (contact) => contact.eventId === selectedEvent.id
+      );
+
+      setSelectedId(remainingEventContacts[0]?.id || "");
+    }
   }
-
-  const newContact: Contact = {
-    id: String(Date.now()),
-    salesforceContactId: result.salesforceContactId,
-    name: result.name,
-    company: result.company,
-    title: result.title,
-    accountOwnerUserId: result.accountOwnerUserId,
-    source: result.source,
-    addedByUserId: currentUser.id,
-    addedAt: nowLabel(),
-    notes: [],
-    followups: [],
-    tags: [],
-  };
-
-  setContacts([newContact, ...contacts]);
-  setSelectedId(newContact.id);
-  setSearch("");
-  setSalesforceResults([]);
-}
 
   function saveNote() {
-    if (!captureText.trim()) return;
+    if (!selected || !captureText.trim()) return;
 
     updateSelectedContact({
       ...selected,
@@ -376,6 +432,8 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
   }
 
   function addFollowup() {
+    if (!selected) return;
+
     if (!captureText.trim()) {
       alert("Write the follow-up in the text box first.");
       return;
@@ -399,6 +457,8 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
   }
 
   function deleteNote(noteId: string) {
+    if (!selected) return;
+
     updateSelectedContact({
       ...selected,
       notes: selected.notes.filter((note) => note.id !== noteId),
@@ -411,7 +471,7 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
   }
 
   function saveEditedNote() {
-    if (!editingNoteId) return;
+    if (!selected || !editingNoteId) return;
 
     updateSelectedContact({
       ...selected,
@@ -430,6 +490,8 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
   }
 
   function deleteFollowup(followupId: string) {
+    if (!selected) return;
+
     updateSelectedContact({
       ...selected,
       followups: selected.followups.filter(
@@ -439,6 +501,8 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
   }
 
   function tagSelectedTeammate() {
+    if (!selected) return;
+
     if (selectedTagUserId === "none") {
       alert("No teammate selected. This is fine for a 1:1 meeting.");
       return;
@@ -470,6 +534,8 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
   }
 
   function deleteTag(tagId: string) {
+    if (!selected) return;
+
     updateSelectedContact({
       ...selected,
       tags: selected.tags.filter((tag) => tag.id !== tagId),
@@ -477,6 +543,8 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
   }
 
   function importGranola() {
+    if (!selected) return;
+
     updateSelectedContact({
       ...selected,
       notes: [
@@ -500,9 +568,11 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
     if (!confirmReset) return;
 
     window.localStorage.removeItem("kargo-event-hub-contacts");
-    setContacts(starterContacts);
-    setSelectedId("contact-jane");
+    setContacts([]);
+    setSelectedId("");
     setSelectedTagUserId("none");
+    setSalesforceResults([]);
+    setSearch("");
   }
 
   return (
@@ -515,6 +585,39 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
             A mobile-first networking layer on top of Salesforce for events,
             notes, follow-ups, Granola context, and teammate tagging.
           </p>
+
+          <div className="eventSelector">
+            <label htmlFor="event-select">Event workspace</label>
+
+            <select
+              id="event-select"
+              value={selectedEventId}
+              onChange={(e) => {
+                setSelectedEventId(e.target.value);
+                setSalesforceResults([]);
+                setSearch("");
+              }}
+              disabled={isLoadingEvents || events.length === 0}
+            >
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.name}
+                </option>
+              ))}
+            </select>
+
+            {selectedEvent && (
+              <span>
+                {selectedEvent.region || "No region"} ·{" "}
+                {selectedEvent.type || "No type"} ·{" "}
+                {selectedEvent.startDate || "No start date"}
+                {selectedEvent.endDate ? ` - ${selectedEvent.endDate}` : ""}
+              </span>
+            )}
+
+            {isLoadingEvents && <span>Loading events...</span>}
+            {eventsError && <span>{eventsError}</span>}
+          </div>
         </div>
 
         <div className="userBar">
@@ -531,11 +634,11 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
       <section className="metrics">
         <div>
           <span>Event</span>
-          <strong>Cannes Lions 2027</strong>
+          <strong>{selectedEvent?.name || "No event selected"}</strong>
         </div>
         <div>
           <span>Event contacts</span>
-          <strong>{contacts.length}</strong>
+          <strong>{eventContacts.length}</strong>
         </div>
         <div>
           <span>Event follow-ups</span>
@@ -548,6 +651,10 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
       </section>
 
       <section className="metrics secondaryMetrics">
+        <div>
+          <span>Unique accounts</span>
+          <strong>{uniqueAccounts}</strong>
+        </div>
         <div>
           <span>My contacts added</span>
           <strong>{myContacts.length}</strong>
@@ -570,250 +677,338 @@ function attachSalesforceContact(result: SalesforceSearchResult) {
         <section className="panel">
           <h2>Salesforce read-only search</h2>
           <p className="muted">
-            This is mocked for now. Later this search box will call a Vercel API
-            route that reads from Salesforce contacts, accounts, and active
-            users.
+            Search private Salesforce Sheet data and attach contacts to{" "}
+            {selectedEvent?.name || "the selected event"}.
           </p>
 
           <div className="searchRow">
-  <input
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    placeholder="Search Salesforce contact or account"
-  />
-  <button onClick={searchSalesforce}>
-    {isSearchingSalesforce ? "Searching..." : "Search"}
-  </button>
-</div>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search Salesforce contact or account"
+            />
+            <button onClick={searchSalesforce}>
+              {isSearchingSalesforce ? "Searching..." : "Search"}
+            </button>
+          </div>
 
-{salesforceResults.length > 0 && (
-  <div className="salesforceResults">
-    {salesforceResults.map((result) => (
-      <div key={result.salesforceContactId} className="salesforceResult">
-        <div>
-          <strong>{result.name}</strong>
-          <span>
-            {result.company} · {result.title}
-          </span>
-          <small>
-            {result.email} · Account owner:{" "}
-            {getUserName(result.accountOwnerUserId)}
-          </small>
-        </div>
+          {salesforceResults.length > 0 && (
+            <div className="searchResultsWrap">
+              <div className="resultsHeader">
+                <strong>
+                  {salesforceResults.length} Salesforce result
+                  {salesforceResults.length === 1 ? "" : "s"}
+                </strong>
+                <button onClick={() => setSalesforceResults([])}>
+                  Clear results
+                </button>
+              </div>
 
-        <button onClick={() => attachSalesforceContact(result)}>
-          Attach
-        </button>
-      </div>
-    ))}
-  </div>
-)}
+              <div className="salesforceResults">
+                {salesforceResults.map((result) => (
+                  <div
+                    key={result.salesforceContactId}
+                    className="salesforceResult"
+                  >
+                    <div>
+                      <strong>{result.name}</strong>
+                      <span>
+                        {result.company || "No account"} ·{" "}
+                        {result.title || "No title"}
+                      </span>
+                      <small>
+                        {result.email || "No email"} · Account owner:{" "}
+                        {result.accountOwnerName ||
+                          getUserName(result.accountOwnerUserId)}
+                      </small>
+                    </div>
+
+                    <button onClick={() => attachSalesforceContact(result)}>
+                      Attach to event
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <h2>Event contacts</h2>
           <p className="muted">
-            Each contact tracks who added them, their Salesforce account owner,
-            notes, follow-ups, and teammate tags.
+            Each contact is linked to {selectedEvent?.name || "this event"} and
+            tracks who added them, their Salesforce account owner, notes,
+            follow-ups, and teammate tags.
           </p>
 
           <div className="contacts">
-            {contacts.map((contact) => (
-              <button
+            {eventContacts.length === 0 && (
+              <p className="empty">
+                No contacts attached to{" "}
+                {selectedEvent?.name || "this event"} yet.
+              </p>
+            )}
+
+            {eventContacts.map((contact) => (
+              <div
                 key={contact.id}
-                className={
-                  contact.id === selected.id ? "contact active" : "contact"
-                }
-                onClick={() => setSelectedId(contact.id)}
+                className={contact.id === selected?.id ? "contact active" : "contact"}
               >
-                <div className="avatar">{getInitials(contact.name)}</div>
-                <div>
-                  <strong>{contact.name}</strong>
-                  <span>
-                    {contact.company} · {contact.title}
-                  </span>
-                  <small>
-                    Added by {getUserName(contact.addedByUserId)} · Account
-                    owner: {getUserName(contact.accountOwnerUserId)}
-                  </small>
-                </div>
-              </button>
+                <button
+                  className="contactMain"
+                  onClick={() => setSelectedId(contact.id)}
+                >
+                  <div className="avatar">{getInitials(contact.name)}</div>
+                  <div>
+                    <strong>{contact.name}</strong>
+                    <span>
+                      {contact.company} · {contact.title}
+                    </span>
+                    <small>
+                      Added by {getUserName(contact.addedByUserId)} · Account
+                      owner:{" "}
+                      {contact.accountOwnerName ||
+                        getUserName(contact.accountOwnerUserId)}
+                    </small>
+                  </div>
+                </button>
+
+                <button
+                  className="removeContactButton"
+                  onClick={() => removeEventContact(contact.id)}
+                >
+                  Remove
+                </button>
+              </div>
             ))}
           </div>
         </section>
 
         <section className="panel">
-          <h2>{selected.name}</h2>
-          <p className="muted">
-            {selected.company} · {selected.title}
-          </p>
-
-          <div className="pillRow">
-            <span>{selected.source}</span>
-            <span>Added by: {getUserName(selected.addedByUserId)}</span>
-            <span>
-              Account owner: {getUserName(selected.accountOwnerUserId)}
-            </span>
-          </div>
-
-          <div className="contactStats">
-            <div>
-              <span>Selected contact notes</span>
-              <strong>{selected.notes.length}</strong>
+          {!selected ? (
+            <div className="emptyStatePanel">
+              <h2>No contact selected</h2>
+              <p className="muted">
+                Search for a Salesforce contact and attach them to{" "}
+                {selectedEvent?.name || "the selected event"} to start adding
+                notes, follow-ups, and teammate tags.
+              </p>
             </div>
-            <div>
-              <span>Selected contact follow-ups</span>
-              <strong>{selected.followups.length}</strong>
-            </div>
-            <div>
-              <span>Selected contact tags</span>
-              <strong>{selected.tags.length}</strong>
-            </div>
-          </div>
+          ) : (
+            <>
+              <h2>{selected.name}</h2>
+              <p className="muted">
+                {selected.company} · {selected.title}
+              </p>
 
-          <div className="capture">
-            <textarea
-              value={captureText}
-              onChange={(e) => setCaptureText(e.target.value)}
-              placeholder="Write a note or follow-up here..."
-            />
+              <div className="pillRow">
+                <span>{selected.source}</span>
+                <span>Added by: {getUserName(selected.addedByUserId)}</span>
+                <span>
+                  Account owner:{" "}
+                  {selected.accountOwnerName ||
+                    getUserName(selected.accountOwnerUserId)}
+                </span>
+              </div>
 
-            <div className="tagBox">
-              <div className="tagBoxHeader">
+              <div className="contactStats">
                 <div>
-                  <strong>Tag active sales rep</strong>
-                  <p>
-                    Choose one rep to loop in, or leave as none for a 1:1
-                    meeting.
-                  </p>
+                  <span>Selected contact notes</span>
+                  <strong>{selected.notes.length}</strong>
+                </div>
+                <div>
+                  <span>Selected contact follow-ups</span>
+                  <strong>{selected.followups.length}</strong>
+                </div>
+                <div>
+                  <span>Selected contact tags</span>
+                  <strong>{selected.tags.length}</strong>
                 </div>
               </div>
 
-              <div className="tagDropdownRow">
-                <select
-                  value={selectedTagUserId}
-                  onChange={(e) => setSelectedTagUserId(e.target.value)}
-                >
-                  <option value="none">None / 1:1 meeting</option>
-                  {activeSalesReps
-                    .filter((rep) => rep.active)
-                    .map((rep) => (
-                      <option key={rep.id} value={rep.id}>
-                        {rep.name} — {rep.role} · {rep.region}
-                      </option>
-                    ))}
-                </select>
+              <div className="capture">
+                <textarea
+                  value={captureText}
+                  onChange={(e) => setCaptureText(e.target.value)}
+                  placeholder="Write a note or follow-up here..."
+                />
 
-                <button onClick={tagSelectedTeammate}>Add teammate tag</button>
-              </div>
-            </div>
+                <div className="tagBox">
+                  <div className="tagBoxHeader">
+                    <div>
+                      <strong>Tag active sales rep</strong>
+                      <p>
+                        Choose one rep to loop in, or leave as none for a 1:1
+                        meeting.
+                      </p>
+                    </div>
+                  </div>
 
-            <div className="buttonGrid">
-              <button onClick={saveNote}>Save as note</button>
-              <button onClick={addFollowup}>Save as follow-up</button>
-              <button onClick={importGranola}>Import Granola</button>
-            </div>
-          </div>
+                  <div className="tagDropdownRow">
+                    <select
+                      value={selectedTagUserId}
+                      onChange={(e) => setSelectedTagUserId(e.target.value)}
+                    >
+                      <option value="none">None / 1:1 meeting</option>
+                      {activeSalesReps
+                        .filter((rep) => rep.active)
+                        .map((rep) => (
+                          <option key={rep.id} value={rep.id}>
+                            {rep.name} — {rep.role} · {rep.region}
+                          </option>
+                        ))}
+                    </select>
 
-          <div className="sections">
-            <div>
-              <h3>Notes</h3>
-              {selected.notes.length === 0 && (
-                <p className="empty">No notes yet.</p>
-              )}
-
-              {selected.notes.map((note) => (
-                <div key={note.id} className="item">
-                  {editingNoteId === note.id ? (
-                    <>
-                      <textarea
-                        value={editingNoteText}
-                        onChange={(e) => setEditingNoteText(e.target.value)}
-                      />
-                      <div className="miniActions">
-                        <button onClick={saveEditedNote}>Save edit</button>
-                        <button onClick={() => setEditingNoteId(null)}>
-                          Cancel
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <p>{note.text}</p>
-                      <small>
-                        Created by {getUserName(note.createdByUserId)} ·{" "}
-                        {note.createdAt}
-                      </small>
-                      <div className="miniActions">
-                        <button onClick={() => startEditingNote(note)}>
-                          Edit
-                        </button>
-                        <button onClick={() => deleteNote(note.id)}>
-                          Delete
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div>
-              <h3>Follow-ups</h3>
-              {selected.followups.length === 0 && (
-                <p className="empty">No follow-ups yet.</p>
-              )}
-
-              {selected.followups.map((followup) => (
-                <div key={followup.id} className="item">
-                  <p>{followup.text}</p>
-                  <small>
-                    Created by {getUserName(followup.createdByUserId)} ·
-                    Assigned to {getUserName(followup.assignedToUserId)} ·{" "}
-                    {followup.createdAt}
-                  </small>
-                  <div className="miniActions">
-                    <button onClick={() => deleteFollowup(followup.id)}>
-                      Delete
+                    <button onClick={tagSelectedTeammate}>
+                      Add teammate tag
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            <div>
-              <h3>Team tags</h3>
-              {selected.tags.length === 0 && (
-                <p className="empty">
-                  No teammate tags. This can be a 1:1 meeting.
-                </p>
-              )}
-
-              {selected.tags.map((tag) => (
-                <div key={tag.id} className="item tagItem">
-                  <div>
-                    <p>{getUserName(tag.taggedUserId)}</p>
-                    <small>
-                      Tagged by {getUserName(tag.taggedByUserId)} ·{" "}
-                      {tag.createdAt}
-                    </small>
-                  </div>
-                  <button onClick={() => deleteTag(tag.id)}>Delete</button>
+                <div className="buttonGrid">
+                  <button onClick={saveNote}>Save as note</button>
+                  <button onClick={addFollowup}>Save as follow-up</button>
+                  <button onClick={importGranola}>Import Granola</button>
                 </div>
-              ))}
-            </div>
-
-            <div>
-              <h3>Who is meeting with whom?</h3>
-              <div className="relationshipList">
-                {Object.entries(contactsAddedByUser).map(([userId, count]) => (
-                  <div key={userId} className="relationshipRow">
-                    <strong>{getUserName(userId)}</strong>
-                    <span>
-                      added {count} contact{count === 1 ? "" : "s"} at Cannes
-                    </span>
-                  </div>
-                ))}
               </div>
-            </div>
-          </div>
+
+              <div className="sections">
+                <div>
+                  <h3>Notes</h3>
+                  {selected.notes.length === 0 && (
+                    <p className="empty">No notes yet.</p>
+                  )}
+
+                  {selected.notes.map((note) => (
+                    <div key={note.id} className="item">
+                      {editingNoteId === note.id ? (
+                        <>
+                          <textarea
+                            value={editingNoteText}
+                            onChange={(e) =>
+                              setEditingNoteText(e.target.value)
+                            }
+                          />
+                          <div className="miniActions">
+                            <button onClick={saveEditedNote}>Save edit</button>
+                            <button onClick={() => setEditingNoteId(null)}>
+                              Cancel
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p>{note.text}</p>
+                          <small>
+                            Created by {getUserName(note.createdByUserId)} ·{" "}
+                            {note.createdAt}
+                          </small>
+                          <div className="miniActions">
+                            <button onClick={() => startEditingNote(note)}>
+                              Edit
+                            </button>
+                            <button onClick={() => deleteNote(note.id)}>
+                              Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <h3>Follow-ups</h3>
+                  {selected.followups.length === 0 && (
+                    <p className="empty">No follow-ups yet.</p>
+                  )}
+
+                  {selected.followups.map((followup) => (
+                    <div key={followup.id} className="item">
+                      <p>{followup.text}</p>
+                      <small>
+                        Created by {getUserName(followup.createdByUserId)} ·
+                        Assigned to {getUserName(followup.assignedToUserId)} ·{" "}
+                        {followup.createdAt}
+                      </small>
+                      <div className="miniActions">
+                        <button onClick={() => deleteFollowup(followup.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <h3>Team tags</h3>
+                  {selected.tags.length === 0 && (
+                    <p className="empty">
+                      No teammate tags. This can be a 1:1 meeting.
+                    </p>
+                  )}
+
+                  {selected.tags.map((tag) => (
+                    <div key={tag.id} className="item tagItem">
+                      <div>
+                        <p>{getUserName(tag.taggedUserId)}</p>
+                        <small>
+                          Tagged by {getUserName(tag.taggedByUserId)} ·{" "}
+                          {tag.createdAt}
+                        </small>
+                      </div>
+                      <button onClick={() => deleteTag(tag.id)}>Delete</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <h3>Who is meeting with whom?</h3>
+                  <div className="relationshipList">
+                    {Object.entries(contactsAddedByUser).length === 0 && (
+                      <p className="empty">No contacts added for this event yet.</p>
+                    )}
+
+                    {Object.entries(contactsAddedByUser).map(
+                      ([userId, count]) => (
+                        <div key={userId} className="relationshipRow">
+                          <strong>{getUserName(userId)}</strong>
+                          <span>
+                            added {count} contact{count === 1 ? "" : "s"} to{" "}
+                            {selectedEvent?.name || "this event"}
+                          </span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3>Reporting preview</h3>
+                  <div className="reportGrid">
+                    <div>
+                      <span>Event</span>
+                      <strong>{selectedEvent?.name || "N/A"}</strong>
+                    </div>
+                    <div>
+                      <span>Contacts</span>
+                      <strong>{eventContacts.length}</strong>
+                    </div>
+                    <div>
+                      <span>Unique accounts</span>
+                      <strong>{uniqueAccounts}</strong>
+                    </div>
+                    <div>
+                      <span>Follow-ups</span>
+                      <strong>{eventFollowups}</strong>
+                    </div>
+                    <div>
+                      <span>Team tags</span>
+                      <strong>{eventTags}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </section>
       </div>
     </main>
