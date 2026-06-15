@@ -462,3 +462,35 @@ select {
     grid-template-columns: 1fr;
   }
 }
+.salesforceResults {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 24px;
+}
+
+.salesforceResult {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e7e3dc;
+  border-radius: 16px;
+  background: #fffdf8;
+}
+
+.salesforceResult div {
+  display: grid;
+  gap: 3px;
+}
+
+.salesforceResult span,
+.salesforceResult small {
+  color: #6f675d;
+}
+
+@media (max-width: 850px) {
+  .salesforceResult {
+    grid-template-columns: 1fr;
+  }
+}

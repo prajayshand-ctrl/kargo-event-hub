@@ -51,6 +51,18 @@ type Contact = {
   tags: TeammateTag[];
 };
 
+type SalesforceSearchResult = {
+  salesforceContactId: string;
+  salesforceAccountId: string;
+  name: string;
+  email: string;
+  title: string;
+  company: string;
+  accountOwnerUserId: string;
+  contactOwnerUserId: string;
+  source: string;
+};
+
 const currentUser: UserProfile = {
   id: "user-prajay",
   name: "Prajay Shand",
@@ -223,6 +235,10 @@ export default function Home() {
   const [contacts, setContacts] = useState<Contact[]>(starterContacts);
   const [selectedId, setSelectedId] = useState("contact-jane");
   const [search, setSearch] = useState("");
+  const [salesforceResults, setSalesforceResults] = useState<
+  SalesforceSearchResult[]
+>([]);
+  const [isSearchingSalesforce, setIsSearchingSalesforce] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [selectedTagUserId, setSelectedTagUserId] = useState("none");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -292,35 +308,53 @@ export default function Home() {
     );
   }
 
-  function addMockSalesforceContact() {
-    const contactName = search.trim() || "Sarah Lee";
+async function searchSalesforce() {
+  setIsSearchingSalesforce(true);
 
-    const newContact: Contact = {
-      id: String(Date.now()),
-      salesforceContactId: `003-${Date.now()}`,
-      name: contactName,
-      company: "Nike",
-      title: "Director, Brand Media",
-      accountOwnerUserId: "user-dani",
-      source: "Mock Salesforce lookup",
-      addedByUserId: currentUser.id,
-      addedAt: nowLabel(),
-      notes: [
-        {
-          id: String(Date.now()) + "-note",
-          text: "Added from Salesforce read-only search.",
-          createdByUserId: currentUser.id,
-          createdAt: nowLabel(),
-        },
-      ],
-      followups: [],
-      tags: [],
-    };
+  try {
+    const response = await fetch(
+      `/api/salesforce/search?q=${encodeURIComponent(search)}`
+    );
 
-    setContacts([newContact, ...contacts]);
-    setSelectedId(newContact.id);
-    setSearch("");
+    const data = await response.json();
+    setSalesforceResults(data.results || []);
+  } catch {
+    alert("Salesforce mock search failed.");
+  } finally {
+    setIsSearchingSalesforce(false);
   }
+}
+
+function attachSalesforceContact(result: SalesforceSearchResult) {
+  const alreadyAttached = contacts.some(
+    (contact) => contact.salesforceContactId === result.salesforceContactId
+  );
+
+  if (alreadyAttached) {
+    alert("This Salesforce contact is already attached to the event.");
+    return;
+  }
+
+  const newContact: Contact = {
+    id: String(Date.now()),
+    salesforceContactId: result.salesforceContactId,
+    name: result.name,
+    company: result.company,
+    title: result.title,
+    accountOwnerUserId: result.accountOwnerUserId,
+    source: result.source,
+    addedByUserId: currentUser.id,
+    addedAt: nowLabel(),
+    notes: [],
+    followups: [],
+    tags: [],
+  };
+
+  setContacts([newContact, ...contacts]);
+  setSelectedId(newContact.id);
+  setSearch("");
+  setSalesforceResults([]);
+}
 
   function saveNote() {
     if (!captureText.trim()) return;
@@ -542,14 +576,38 @@ export default function Home() {
           </p>
 
           <div className="searchRow">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search contact or account"
-            />
-            <button onClick={addMockSalesforceContact}>Attach</button>
-          </div>
+  <input
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    placeholder="Search Salesforce contact or account"
+  />
+  <button onClick={searchSalesforce}>
+    {isSearchingSalesforce ? "Searching..." : "Search"}
+  </button>
+</div>
 
+{salesforceResults.length > 0 && (
+  <div className="salesforceResults">
+    {salesforceResults.map((result) => (
+      <div key={result.salesforceContactId} className="salesforceResult">
+        <div>
+          <strong>{result.name}</strong>
+          <span>
+            {result.company} · {result.title}
+          </span>
+          <small>
+            {result.email} · Account owner:{" "}
+            {getUserName(result.accountOwnerUserId)}
+          </small>
+        </div>
+
+        <button onClick={() => attachSalesforceContact(result)}>
+          Attach
+        </button>
+      </div>
+    ))}
+  </div>
+)}
           <h2>Event contacts</h2>
           <p className="muted">
             Each contact tracks who added them, their Salesforce account owner,
