@@ -29,6 +29,18 @@ type Followup = {
   createdAt: string;
 };
 
+type EmailDraft = {
+  id: string;
+  subject: string;
+  body: string;
+  status: "draft" | "copied" | "sent";
+  recipientEmail: string;
+  createdByUserId: string;
+  createdAt: string;
+  sentAt?: string;
+  salesforceEmailLink?: string;
+};
+
 type TeammateTag = {
   id: string;
   taggedUserId: string;
@@ -42,6 +54,7 @@ type Contact = {
   eventName: string;
   salesforceContactId?: string;
   name: string;
+  email?: string;
   company: string;
   title: string;
   accountOwnerUserId: string;
@@ -53,6 +66,7 @@ type Contact = {
   notes: Note[];
   followups: Followup[];
   tags: TeammateTag[];
+  emailDrafts: EmailDraft[];
 };
 
 type SalesforceSearchResult = {
@@ -272,6 +286,9 @@ export default function Home() {
   const [selectedTagUserId, setSelectedTagUserId] = useState("none");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
+  const [draftSubject, setDraftSubject] = useState("");
+  const [draftBody, setDraftBody] = useState("");
+  const [salesforceEmailLink, setSalesforceEmailLink] = useState("");
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
 
   const [events, setEvents] = useState<EventWorkspace[]>([]);
@@ -484,6 +501,7 @@ export default function Home() {
       eventName: selectedEvent.name,
       salesforceContactId: result.salesforceContactId,
       name: result.name,
+      email: result.email,
       company: result.company,
       title: result.title,
       accountOwnerUserId: result.accountOwnerUserId,
@@ -506,6 +524,7 @@ export default function Home() {
       ],
       followups: [],
       tags: [],
+      emailDrafts: [],
     };
 
     setContacts([newContact, ...contacts]);
@@ -535,6 +554,7 @@ export default function Home() {
     eventName: selectedEvent.name,
     salesforceContactId: member.salesforceContactId,
     name: member.name,
+    email: member.email,
     company: member.company || "Unknown account",
     title: member.title || "No title",
     accountOwnerUserId: member.accountOwnerEmail
@@ -557,6 +577,7 @@ export default function Home() {
     ],
     followups: [],
     tags: [],
+    emailDrafts: [],
   };
 
   setContacts([newContact, ...contacts]);
@@ -736,6 +757,106 @@ export default function Home() {
       ],
     });
   }
+  function generateFollowUpDraft() {
+  if (!selected || !selectedEvent) return;
+
+  const firstName = selected.name.split(" ")[0] || selected.name;
+
+  const subject = `Great connecting at ${selectedEvent.name}`;
+
+  const body = `Hi ${firstName},
+
+Great connecting around ${selectedEvent.name}. I wanted to follow up while the conversation was still fresh.
+
+Based on our conversation, I thought it could be helpful to share more on how Kargo can support ${selected.company || "your team"} across premium mobile, creative, and attention-led media solutions.
+
+Happy to send over a few relevant examples or set up time with the right Kargo team member to continue the conversation.
+
+Best,
+${currentUser.name}`;
+
+  setDraftSubject(subject);
+  setDraftBody(body);
+}
+
+function saveEmailDraft() {
+  if (!selected) return;
+
+  if (!selected.email) {
+    alert("This contact does not have an email address.");
+    return;
+  }
+
+  if (!draftSubject.trim() || !draftBody.trim()) {
+    alert("Generate or write a subject and body first.");
+    return;
+  }
+
+  const newDraft: EmailDraft = {
+    id: String(Date.now()),
+    subject: draftSubject.trim(),
+    body: draftBody.trim(),
+    status: "draft",
+    recipientEmail: selected.email,
+    createdByUserId: currentUser.id,
+    createdAt: nowLabel(),
+  };
+
+  updateSelectedContact({
+    ...selected,
+    emailDrafts: [newDraft, ...selected.emailDrafts],
+  });
+
+  setDraftSubject("");
+  setDraftBody("");
+}
+
+async function copyEmailDraft(draft: EmailDraft) {
+  const text = `To: ${draft.recipientEmail}
+Subject: ${draft.subject}
+
+${draft.body}`;
+
+  await navigator.clipboard.writeText(text);
+
+  updateSelectedContact({
+    ...selected,
+    emailDrafts: selected.emailDrafts.map((item) =>
+      item.id === draft.id ? { ...item, status: "copied" } : item
+    ),
+  });
+
+  alert("Email draft copied.");
+}
+
+function markDraftSent(draftId: string) {
+  if (!selected) return;
+
+  updateSelectedContact({
+    ...selected,
+    emailDrafts: selected.emailDrafts.map((draft) =>
+      draft.id === draftId
+        ? {
+            ...draft,
+            status: "sent",
+            sentAt: nowLabel(),
+            salesforceEmailLink: salesforceEmailLink.trim() || draft.salesforceEmailLink,
+          }
+        : draft
+    ),
+  });
+
+  setSalesforceEmailLink("");
+}
+
+function deleteEmailDraft(draftId: string) {
+  if (!selected) return;
+
+  updateSelectedContact({
+    ...selected,
+    emailDrafts: selected.emailDrafts.filter((draft) => draft.id !== draftId),
+  });
+}
 
   function resetPrototypeData() {
     const confirmReset = window.confirm(
@@ -1126,6 +1247,41 @@ export default function Home() {
                   <button onClick={importGranola}>Import Granola</button>
                 </div>
               </div>
+                <div className="emailDraftBox">
+  <div>
+    <strong>Follow-up email</strong>
+    <p>
+      Draft a follow-up to {selected.email || "this contact"}. Copy it into
+      Gmail/Outlook for now, then mark it sent and paste the Salesforce/Weflow
+      link when available.
+    </p>
+  </div>
+
+  <div className="emailMeta">
+    <span>To: {selected.email || "No email available"}</span>
+  </div>
+
+  <button onClick={generateFollowUpDraft} disabled={!selected.email}>
+    Generate draft
+  </button>
+
+  <input
+    value={draftSubject}
+    onChange={(e) => setDraftSubject(e.target.value)}
+    placeholder="Email subject"
+  />
+
+  <textarea
+    value={draftBody}
+    onChange={(e) => setDraftBody(e.target.value)}
+    placeholder="Email body"
+  />
+
+  <button onClick={saveEmailDraft} disabled={!selected.email}>
+    Save email draft
+  </button>
+</div>
+
 
               <div className="sections">
                 <div>
@@ -1216,7 +1372,54 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
+<div>
+  <h3>Follow-up email drafts</h3>
 
+  {selected.emailDrafts.length === 0 && (
+    <p className="empty">No email drafts yet.</p>
+  )}
+
+  {selected.emailDrafts.map((draft) => (
+    <div key={draft.id} className="item emailDraftItem">
+      <div className="emailDraftHeader">
+        <strong>{draft.subject}</strong>
+        <span className={`emailStatus ${draft.status}`}>{draft.status}</span>
+      </div>
+
+      <small>
+        To: {draft.recipientEmail} · Created by{" "}
+        {getUserName(draft.createdByUserId)} · {draft.createdAt}
+      </small>
+
+      <p className="emailBodyPreview">{draft.body}</p>
+
+      {draft.sentAt && <small>Sent at: {draft.sentAt}</small>}
+
+      {draft.salesforceEmailLink && (
+        <small>
+          Salesforce/Weflow link:{" "}
+          <a href={draft.salesforceEmailLink} target="_blank">
+            Open logged email
+          </a>
+        </small>
+      )}
+
+      <div className="salesforceLinkRow">
+        <input
+          value={salesforceEmailLink}
+          onChange={(e) => setSalesforceEmailLink(e.target.value)}
+          placeholder="Paste Salesforce/Weflow email link before marking sent"
+        />
+      </div>
+
+      <div className="miniActions">
+        <button onClick={() => copyEmailDraft(draft)}>Copy draft</button>
+        <button onClick={() => markDraftSent(draft.id)}>Mark sent</button>
+        <button onClick={() => deleteEmailDraft(draft.id)}>Delete</button>
+      </div>
+    </div>
+  ))}
+</div>
                 <div>
                   <h3>Who is meeting with whom?</h3>
                   <div className="relationshipList">

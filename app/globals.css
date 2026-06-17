@@ -801,3 +801,79 @@ select {
     margin-left: 54px;
   }
 }
+.emailDraftBox {
+  border: 1px solid var(--line);
+  background: #f8fbff;
+  border-radius: 20px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.emailDraftBox p {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.emailMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.emailMeta span {
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #203b70;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.emailDraftItem {
+  display: grid;
+  gap: 8px;
+}
+
+.emailDraftHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.emailStatus {
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.emailStatus.draft {
+  background: #eef4ff;
+  color: #203b70;
+}
+
+.emailStatus.copied {
+  background: #fff8df;
+  color: #735300;
+}
+
+.emailStatus.sent {
+  background: #e9f8ef;
+  color: #176534;
+}
+
+.emailBodyPreview {
+  white-space: pre-wrap;
+  color: var(--ink);
+  background: #f8fbff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.salesforceLinkRow {
+  margin-top: 4px;
+}
