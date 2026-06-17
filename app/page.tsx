@@ -85,6 +85,26 @@ type EventWorkspace = {
   lastModifiedDate: string;
 };
 
+type CampaignMember = {
+  campaignName: string;
+  campaignId: string;
+  memberId: string;
+  firstName: string;
+  lastName: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  memberStatus: string;
+  salesforceContactId: string;
+  email: string;
+  title: string;
+  company: string;
+  salesforceAccountId: string;
+  accountOwnerName: string;
+  accountOwnerEmail: string;
+  source: string;
+};
+
 const currentUser: UserProfile = {
   id: "user-prajay",
   name: "Prajay Shand",
@@ -156,6 +176,67 @@ const activeSalesReps: UserProfile[] = [
 ];
 
 const allUsers = [currentUser, ...activeSalesReps];
+const campaignMemberStatusOptions = [
+  {
+    label: "All",
+    value: "all",
+  },
+  {
+    label: "RSVP Yes",
+    value: "RSVP_Yes",
+  },
+  {
+    label: "Checked In",
+    value: "CheckedIn",
+  },
+  {
+    label: "Check-in Yes",
+    value: "checkin_yes",
+  },
+  {
+    label: "Declined",
+    value: "Declined",
+  },
+  {
+    label: "No Response",
+    value: "Sent - No Response",
+  },
+];
+
+function getStatusLabel(status: string) {
+  if (!status) return "No status";
+
+  const match = campaignMemberStatusOptions.find(
+    (option) => option.value.toLowerCase() === status.toLowerCase()
+  );
+
+  return match?.label || status;
+}
+
+function getStatusClass(status: string) {
+  const normalized = status.toLowerCase();
+
+  if (
+    normalized.includes("checkedin") ||
+    normalized.includes("checkin_yes")
+  ) {
+    return "statusPill attended";
+  }
+
+  if (normalized.includes("rsvp_yes") || normalized.includes("responded")) {
+    return "statusPill positive";
+  }
+
+  if (normalized.includes("declined") || normalized.includes("unsubscribe")) {
+    return "statusPill declined";
+  }
+
+  if (normalized.includes("no response") || normalized.includes("invited")) {
+    return "statusPill pending";
+  }
+
+  return "statusPill";
+}
 
 function getUserName(userId: string) {
   return allUsers.find((user) => user.id === userId)?.name || "Unknown user";
@@ -197,7 +278,12 @@ export default function Home() {
   const [selectedEventId, setSelectedEventId] = useState("");
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [eventsError, setEventsError] = useState("");
-
+  const [campaignMembers, setCampaignMembers] = useState<CampaignMember[]>([]);
+  const [campaignMemberStatusFilter, setCampaignMemberStatusFilter] =
+  useState("all");
+  const [isLoadingCampaignMembers, setIsLoadingCampaignMembers] =
+  useState(false);
+  const [campaignMembersError, setCampaignMembersError] = useState("");
   useEffect(() => {
     const saved = window.localStorage.getItem("kargo-event-hub-contacts");
 
@@ -256,6 +342,48 @@ export default function Home() {
 
     loadEvents();
   }, []);
+
+  useEffect(() => {
+  async function loadCampaignMembers() {
+    if (!selectedEventId) {
+      setCampaignMembers([]);
+      return;
+    }
+
+    setIsLoadingCampaignMembers(true);
+    setCampaignMembersError("");
+
+    try {
+      const statusQuery =
+        campaignMemberStatusFilter === "all"
+          ? ""
+          : `&status=${encodeURIComponent(campaignMemberStatusFilter)}`;
+
+      const response = await fetch(
+        `/api/campaign-members?campaignId=${encodeURIComponent(
+          selectedEventId
+        )}${statusQuery}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Campaign members request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setCampaignMembers(data.results || []);
+    } catch (error) {
+      console.error("Failed to load campaign members:", error);
+      setCampaignMembersError(
+        "Could not load campaign contacts from the private Sheet."
+      );
+      setCampaignMembers([]);
+    } finally {
+      setIsLoadingCampaignMembers(false);
+    }
+  }
+
+  loadCampaignMembers();
+}, [selectedEventId, campaignMemberStatusFilter]);
 
   const selectedEvent =
     events.find((event) => event.id === selectedEventId) || events[0] || null;
@@ -385,6 +513,55 @@ export default function Home() {
     setSearch("");
     setSalesforceResults([]);
   }
+
+  function openOrAttachCampaignMember(member: CampaignMember) {
+  if (!selectedEvent) {
+    alert("Choose an event before opening a campaign contact.");
+    return;
+  }
+
+  const existingContact = eventContacts.find(
+    (contact) => contact.salesforceContactId === member.salesforceContactId
+  );
+
+  if (existingContact) {
+    setSelectedId(existingContact.id);
+    return;
+  }
+
+  const newContact: Contact = {
+    id: `${Date.now()}-${member.salesforceContactId}`,
+    eventId: selectedEvent.id,
+    eventName: selectedEvent.name,
+    salesforceContactId: member.salesforceContactId,
+    name: member.name,
+    company: member.company || "Unknown account",
+    title: member.title || "No title",
+    accountOwnerUserId: member.accountOwnerEmail
+      ? `owner-${member.accountOwnerEmail.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+      : "unknown-owner",
+    accountOwnerName: member.accountOwnerName,
+    accountOwnerEmail: member.accountOwnerEmail,
+    source: member.source,
+    addedByUserId: currentUser.id,
+    addedAt: nowLabel(),
+    notes: [
+      {
+        id: `${Date.now()}-campaign-member-note`,
+        text: `Added from campaign member list. Campaign status: ${
+          member.memberStatus || "N/A"
+        }. Email: ${member.email || "N/A"}.`,
+        createdByUserId: currentUser.id,
+        createdAt: nowLabel(),
+      },
+    ],
+    followups: [],
+    tags: [],
+  };
+
+  setContacts([newContact, ...contacts]);
+  setSelectedId(newContact.id);
+}
 
   function removeEventContact(contactId: string) {
     const contactToRemove = contacts.find((contact) => contact.id === contactId);
@@ -675,63 +852,143 @@ export default function Home() {
 
       <div className="grid">
         <section className="panel">
-          <h2>Salesforce read-only search</h2>
-          <p className="muted">
-            Search private Salesforce Sheet data and attach contacts to{" "}
-            {selectedEvent?.name || "the selected event"}.
-          </p>
+         <h2>Campaign contacts</h2>
+<p className="muted">
+  Showing contacts tied to {selectedEvent?.name || "the selected campaign"} from
+  the private campaign member Sheet.
+</p>
 
-          <div className="searchRow">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search Salesforce contact or account"
-            />
-            <button onClick={searchSalesforce}>
-              {isSearchingSalesforce ? "Searching..." : "Search"}
+<div className="statusFilterRow">
+  {campaignMemberStatusOptions.map((option) => (
+    <button
+      key={option.value}
+      className={
+        campaignMemberStatusFilter === option.value
+          ? "filterChip active"
+          : "filterChip"
+      }
+      onClick={() => setCampaignMemberStatusFilter(option.value)}
+    >
+      {option.label}
+    </button>
+  ))}
+</div>
+
+{isLoadingCampaignMembers && (
+  <p className="empty">Loading campaign contacts...</p>
+)}
+
+{campaignMembersError && <p className="errorText">{campaignMembersError}</p>}
+
+{!isLoadingCampaignMembers &&
+  !campaignMembersError &&
+  campaignMembers.length === 0 && (
+    <p className="empty">
+      No campaign contacts found for this event and filter.
+    </p>
+  )}
+
+{campaignMembers.length > 0 && (
+  <div className="campaignMembersList">
+    {campaignMembers.map((member) => {
+      const alreadyAttached = eventContacts.some(
+        (contact) => contact.salesforceContactId === member.salesforceContactId
+      );
+
+      return (
+        <div
+          key={member.memberId || member.salesforceContactId}
+          className="campaignMemberCard"
+        >
+          <button
+            className="campaignMemberMain"
+            onClick={() => openOrAttachCampaignMember(member)}
+          >
+            <div className="avatar">{getInitials(member.name || "NA")}</div>
+
+            <div>
+              <div className="campaignMemberHeader">
+                <strong>{member.name || "Unnamed contact"}</strong>
+                <span className={getStatusClass(member.memberStatus)}>
+                  {getStatusLabel(member.memberStatus)}
+                </span>
+              </div>
+
+              <span>
+                {member.company || "No account"} · {member.title || "No title"}
+              </span>
+
+              <small>
+                {member.email || "No email"} · Account owner:{" "}
+                {member.accountOwnerName || "Unknown"}
+              </small>
+            </div>
+          </button>
+
+          <button
+            className={alreadyAttached ? "attachedButton" : "attachMemberButton"}
+            onClick={() => openOrAttachCampaignMember(member)}
+          >
+            {alreadyAttached ? "Open" : "Add"}
+          </button>
+        </div>
+      );
+    })}
+  </div>
+)}
+<div className="manualSearchBox">
+  <h3>Manual add</h3>
+  <p className="muted">
+    Search all Salesforce contacts only if someone is missing from the campaign
+    member list.
+  </p>
+
+  <div className="searchRow">
+    <input
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Search all Salesforce contacts"
+    />
+    <button onClick={searchSalesforce}>
+      {isSearchingSalesforce ? "Searching..." : "Search"}
+    </button>
+  </div>
+
+  {salesforceResults.length > 0 && (
+    <div className="searchResultsWrap">
+      <div className="resultsHeader">
+        <strong>
+          {salesforceResults.length} Salesforce result
+          {salesforceResults.length === 1 ? "" : "s"}
+        </strong>
+        <button onClick={() => setSalesforceResults([])}>Clear results</button>
+      </div>
+
+      <div className="salesforceResults">
+        {salesforceResults.map((result) => (
+          <div key={result.salesforceContactId} className="salesforceResult">
+            <div>
+              <strong>{result.name}</strong>
+              <span>
+                {result.company || "No account"} ·{" "}
+                {result.title || "No title"}
+              </span>
+              <small>
+                {result.email || "No email"} · Account owner:{" "}
+                {result.accountOwnerName ||
+                  getUserName(result.accountOwnerUserId)}
+              </small>
+            </div>
+
+            <button onClick={() => attachSalesforceContact(result)}>
+              Attach to event
             </button>
           </div>
-
-          {salesforceResults.length > 0 && (
-            <div className="searchResultsWrap">
-              <div className="resultsHeader">
-                <strong>
-                  {salesforceResults.length} Salesforce result
-                  {salesforceResults.length === 1 ? "" : "s"}
-                </strong>
-                <button onClick={() => setSalesforceResults([])}>
-                  Clear results
-                </button>
-              </div>
-
-              <div className="salesforceResults">
-                {salesforceResults.map((result) => (
-                  <div
-                    key={result.salesforceContactId}
-                    className="salesforceResult"
-                  >
-                    <div>
-                      <strong>{result.name}</strong>
-                      <span>
-                        {result.company || "No account"} ·{" "}
-                        {result.title || "No title"}
-                      </span>
-                      <small>
-                        {result.email || "No email"} · Account owner:{" "}
-                        {result.accountOwnerName ||
-                          getUserName(result.accountOwnerUserId)}
-                      </small>
-                    </div>
-
-                    <button onClick={() => attachSalesforceContact(result)}>
-                      Attach to event
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
+        ))}
+      </div>
+    </div>
+  )}
+</div>
           <h2>Event contacts</h2>
           <p className="muted">
             Each contact is linked to {selectedEvent?.name || "this event"} and

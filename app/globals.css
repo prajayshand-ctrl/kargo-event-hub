@@ -663,3 +663,141 @@ select {
     grid-template-columns: 1fr;
   }
 }
+.statusFilterRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 16px;
+}
+
+.filterChip {
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #203b70;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.filterChip.active {
+  color: white;
+  background: linear-gradient(135deg, #315dff, #6b7cff);
+}
+
+.campaignMembersList {
+  display: grid;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 22px;
+}
+
+.campaignMemberCard {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 12px;
+  background: white;
+}
+
+.campaignMemberMain {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.campaignMemberMain span,
+.campaignMemberMain small {
+  display: block;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.campaignMemberHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.statusPill {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #eef4ff;
+  color: #203b70;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.statusPill.positive {
+  background: #e9f8ef;
+  color: #176534;
+}
+
+.statusPill.attended {
+  background: #eaf2ff;
+  color: #164ea3;
+}
+
+.statusPill.declined {
+  background: #fff1f1;
+  color: #9f1d1d;
+}
+
+.statusPill.pending {
+  background: #fff8df;
+  color: #735300;
+}
+
+.attachMemberButton,
+.attachedButton {
+  padding: 9px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.attachMemberButton {
+  color: white;
+  background: linear-gradient(135deg, #315dff, #6b7cff);
+}
+
+.attachedButton {
+  background: #e9f8ef;
+  color: #176534;
+}
+
+.manualSearchBox {
+  border-top: 1px solid var(--line);
+  margin-top: 22px;
+  padding-top: 18px;
+}
+
+.errorText {
+  margin-top: 10px;
+  color: #9f1d1d;
+  font-weight: 800;
+}
+
+@media (max-width: 850px) {
+  .campaignMemberCard {
+    grid-template-columns: 1fr;
+  }
+
+  .attachMemberButton,
+  .attachedButton {
+    width: fit-content;
+    margin-left: 54px;
+  }
+}
