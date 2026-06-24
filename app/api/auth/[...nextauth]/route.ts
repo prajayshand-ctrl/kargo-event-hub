@@ -10,7 +10,7 @@ const handler = NextAuth({
   ],
   callbacks: {
     async signIn({ profile }) {
-      const email = profile?.email || "";
+      const email = String(profile?.email || "").toLowerCase();
       return email.endsWith("@kargo.com");
     },
     async session({ session }) {

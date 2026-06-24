@@ -307,6 +307,7 @@ export default function Home() {
 
   const [events, setEvents] = useState<EventWorkspace[]>([]);
   const [selectedEventId, setSelectedEventId] = useState("");
+  const [eventSearch, setEventSearch] = useState("");
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [eventsError, setEventsError] = useState("");
   const [campaignMembers, setCampaignMembers] = useState<CampaignMember[]>([]);
@@ -433,7 +434,23 @@ export default function Home() {
     }
 
     loadCampaignMembers();
+
   }, [session, selectedEventId, campaignMemberStatusFilter]);
+const filteredEvents = events.filter((event) => {
+  const searchable = [
+    event.name,
+    event.region,
+    event.type,
+    event.status,
+    event.owner,
+    event.startDate,
+    event.endDate,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return searchable.includes(eventSearch.toLowerCase());
+});
 
   const selectedEvent =
     events.find((event) => event.id === selectedEventId) || events[0] || null;
@@ -944,63 +961,79 @@ ${draft.body}`;
 
   return (
     <main className="app">
-      <section className="hero">
-        <div>
-          <p className="eyebrow">Kargo Internal Prototype</p>
-          <h1>Kargo Event Hub</h1>
-          <p>
-            A mobile-first networking layer on top of Salesforce for events,
-            notes, follow-ups, Granola context, and teammate tagging.
-          </p>
+      <section className="appHeader">
+  <div className="topBar">
+    <div>
+      <p className="eyebrow">Kargo Internal Prototype</p>
+      <h1>Kargo Event Hub</h1>
+    </div>
 
-          <div className="eventSelector">
-            <label htmlFor="event-select">Event workspace</label>
+    <div className="signedInCard">
+      <div className="avatar small">{getInitials(currentUser.name)}</div>
+      <div>
+        <strong>{currentUser.name}</strong>
+        <span>{currentUser.email}</span>
+      </div>
+      <button onClick={() => signOut()}>Sign out</button>
+    </div>
+  </div>
 
-            <select
-              id="event-select"
-              value={selectedEventId}
-              onChange={(e) => {
-                setSelectedEventId(e.target.value);
-                setSalesforceResults([]);
-                setSearch("");
-              }}
-              disabled={isLoadingEvents || events.length === 0}
-            >
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.name}
-                </option>
-              ))}
-            </select>
+  <p className="headerSubtitle">
+    A networking workspace for event contacts, notes, follow-ups, teammate
+    tags, and email drafts.
+  </p>
 
-            {selectedEvent && (
-              <span>
-                {selectedEvent.region || "No region"} ·{" "}
-                {selectedEvent.type || "No type"} ·{" "}
-                {selectedEvent.startDate || "No start date"}
-                {selectedEvent.endDate ? ` - ${selectedEvent.endDate}` : ""}
-              </span>
-            )}
+  <div className="eventCommandBar">
+    <div className="eventSearchBox">
+      <label htmlFor="event-search">Search Event</label>
+      <input
+        id="event-search"
+        value={eventSearch}
+        onChange={(e) => setEventSearch(e.target.value)}
+        placeholder="Search Event"
+      />
+    </div>
 
-            {isLoadingEvents && <span>Loading events...</span>}
-            {eventsError && <span>{eventsError}</span>}
-          </div>
-        </div>
+    <div className="eventSelectBox">
+      <label htmlFor="event-select">Selected Event</label>
+      <select
+        id="event-select"
+        value={selectedEventId}
+        onChange={(e) => {
+          setSelectedEventId(e.target.value);
+          setSalesforceResults([]);
+          setSearch("");
+        }}
+        disabled={isLoadingEvents || filteredEvents.length === 0}
+      >
+        {filteredEvents.map((event) => (
+          <option key={event.id} value={event.id}>
+            {event.name}
+          </option>
+        ))}
+      </select>
+    </div>
 
-        <div className="userBar">
-          <div>
-            <strong>Signed in as {currentUser.name}</strong>
-            <span>
-              {currentUser.role} · {currentUser.team} · {currentUser.email}
-            </span>
-          </div>
+    <button className="resetButton" onClick={resetPrototypeData}>
+      Reset my data
+    </button>
+  </div>
 
-          <div className="miniActions">
-            <button onClick={resetPrototypeData}>Reset my prototype data</button>
-            <button onClick={() => signOut()}>Sign out</button>
-          </div>
-        </div>
-      </section>
+  {eventSearch && filteredEvents.length === 0 && (
+    <p className="headerMessage">No matching events found.</p>
+  )}
+
+  {selectedEvent && (
+    <p className="selectedEventMeta">
+      {selectedEvent.region || "No region"} · {selectedEvent.type || "No type"} ·{" "}
+      {selectedEvent.startDate || "No start date"}
+      {selectedEvent.endDate ? ` - ${selectedEvent.endDate}` : ""}
+    </p>
+  )}
+
+  {isLoadingEvents && <p className="headerMessage">Loading events...</p>}
+  {eventsError && <p className="headerError">{eventsError}</p>}
+</section>
 
       <section className="metrics">
         <div>

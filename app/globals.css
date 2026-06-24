@@ -910,3 +910,146 @@ button:disabled {
     width: 100%;
   }
 }
+/* Compact authenticated app header */
+
+.appHeader {
+  border-radius: 24px;
+  padding: 22px;
+  color: white;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.14), transparent 32%),
+    linear-gradient(135deg, #101d3d 0%, #1e3c8d 56%, #315dff 100%);
+  box-shadow: var(--shadow);
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.appHeader h1 {
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.headerSubtitle {
+  margin-top: 8px;
+  max-width: 820px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.signedInCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 330px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.signedInCard span {
+  display: block;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+}
+
+.signedInCard button {
+  margin-left: auto;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 9px 11px;
+}
+
+.avatar.small {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+}
+
+.eventCommandBar {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 20px;
+}
+
+.eventSearchBox,
+.eventSelectBox {
+  display: grid;
+  gap: 7px;
+}
+
+.eventSearchBox label,
+.eventSelectBox label {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eventCommandBar input,
+.eventCommandBar select {
+  min-height: 46px;
+  border: 0;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+}
+
+.resetButton {
+  min-height: 46px;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.selectedEventMeta,
+.headerMessage,
+.headerError {
+  margin-top: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.selectedEventMeta,
+.headerMessage {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.headerError {
+  color: #ffe0e0;
+}
+
+@media (max-width: 950px) {
+  .topBar,
+  .signedInCard {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .signedInCard {
+    min-width: 0;
+  }
+
+  .eventCommandBar {
+    grid-template-columns: 1fr;
+  }
+
+  .resetButton {
+    width: 100%;
+  }
+}
