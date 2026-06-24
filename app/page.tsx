@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { signIn, signOut, useSession } from "next-auth/react";
 
 type UserProfile = {
   id: string;
@@ -119,17 +120,24 @@ type CampaignMember = {
   source: string;
 };
 
-const currentUser: UserProfile = {
-  id: "user-prajay",
-  name: "Prajay Shand",
-  email: "prajay.shand@kargo.com",
-  role: "Strategy & Ops",
-  team: "BizOps",
-  region: "US",
-  salesforceUserId: "005-prajay-placeholder",
-  slackUserId: "U-prajay-placeholder",
-  active: true,
-};
+function buildCurrentUser(sessionUser?: {
+  name?: string | null;
+  email?: string | null;
+}): UserProfile {
+  const email = sessionUser?.email || "";
+
+  return {
+    id: email || "unknown-user",
+    name: sessionUser?.name || email || "Unknown user",
+    email,
+    role: "Kargo user",
+    team: "Kargo",
+    region: "US",
+    salesforceUserId: email ? `google-${email}` : "unknown-user",
+    slackUserId: email ? `google-${email}` : "unknown-user",
+    active: true,
+  };
+}
 
 const activeSalesReps: UserProfile[] = [
   {
@@ -189,7 +197,14 @@ const activeSalesReps: UserProfile[] = [
   },
 ];
 
-const allUsers = [currentUser, ...activeSalesReps];
+function getAllUsers(currentUser: UserProfile) {
+  const hasCurrentUser = activeSalesReps.some(
+    (user) => user.email.toLowerCase() === currentUser.email.toLowerCase()
+  );
+
+  return hasCurrentUser ? activeSalesReps : [currentUser, ...activeSalesReps];
+}
+
 const campaignMemberStatusOptions = [
   {
     label: "All",
@@ -230,10 +245,7 @@ function getStatusLabel(status: string) {
 function getStatusClass(status: string) {
   const normalized = status.toLowerCase();
 
-  if (
-    normalized.includes("checkedin") ||
-    normalized.includes("checkin_yes")
-  ) {
+  if (normalized.includes("checkedin") || normalized.includes("checkin_yes")) {
     return "statusPill attended";
   }
 
@@ -252,8 +264,8 @@ function getStatusClass(status: string) {
   return "statusPill";
 }
 
-function getUserName(userId: string) {
-  return allUsers.find((user) => user.id === userId)?.name || "Unknown user";
+function getUserName(userId: string, users: UserProfile[]) {
+  return users.find((user) => user.id === userId)?.name || "Unknown user";
 }
 
 function getInitials(name: string) {
@@ -275,6 +287,8 @@ function nowLabel() {
 }
 
 export default function Home() {
+  const { data: session, status } = useSession();
+
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
@@ -297,20 +311,40 @@ export default function Home() {
   const [eventsError, setEventsError] = useState("");
   const [campaignMembers, setCampaignMembers] = useState<CampaignMember[]>([]);
   const [campaignMemberStatusFilter, setCampaignMemberStatusFilter] =
-  useState("all");
+    useState("all");
   const [isLoadingCampaignMembers, setIsLoadingCampaignMembers] =
-  useState(false);
+    useState(false);
   const [campaignMembersError, setCampaignMembersError] = useState("");
+
+  const currentUser = useMemo(
+    () => buildCurrentUser(session?.user),
+    [session?.user]
+  );
+
+  const allUsers = useMemo(() => getAllUsers(currentUser), [currentUser]);
+
+  const storageKey = currentUser.email
+    ? `kargo-event-hub:${currentUser.email}:contacts`
+    : "";
+
   useEffect(() => {
-    const saved = window.localStorage.getItem("kargo-event-hub-contacts");
+    if (!storageKey) return;
+
+    const saved = window.localStorage.getItem(storageKey);
 
     if (saved) {
       try {
         const parsedContacts = JSON.parse(saved) as Contact[];
-        setContacts(parsedContacts);
 
-        if (parsedContacts.length > 0) {
-          setSelectedId(parsedContacts[0].id);
+        const migratedContacts = parsedContacts.map((contact) => ({
+          ...contact,
+          emailDrafts: contact.emailDrafts || [],
+        }));
+
+        setContacts(migratedContacts);
+
+        if (migratedContacts.length > 0) {
+          setSelectedId(migratedContacts[0].id);
         }
       } catch {
         setContacts([]);
@@ -318,18 +352,17 @@ export default function Home() {
     }
 
     setHasLoadedStorage(true);
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
-    if (!hasLoadedStorage) return;
+    if (!hasLoadedStorage || !storageKey) return;
 
-    window.localStorage.setItem(
-      "kargo-event-hub-contacts",
-      JSON.stringify(contacts)
-    );
-  }, [contacts, hasLoadedStorage]);
+    window.localStorage.setItem(storageKey, JSON.stringify(contacts));
+  }, [contacts, hasLoadedStorage, storageKey]);
 
   useEffect(() => {
+    if (!session) return;
+
     async function loadEvents() {
       setIsLoadingEvents(true);
       setEventsError("");
@@ -358,49 +391,49 @@ export default function Home() {
     }
 
     loadEvents();
-  }, []);
+  }, [session]);
 
   useEffect(() => {
-  async function loadCampaignMembers() {
-    if (!selectedEventId) {
-      setCampaignMembers([]);
-      return;
-    }
-
-    setIsLoadingCampaignMembers(true);
-    setCampaignMembersError("");
-
-    try {
-      const statusQuery =
-        campaignMemberStatusFilter === "all"
-          ? ""
-          : `&status=${encodeURIComponent(campaignMemberStatusFilter)}`;
-
-      const response = await fetch(
-        `/api/campaign-members?campaignId=${encodeURIComponent(
-          selectedEventId
-        )}${statusQuery}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Campaign members request failed: ${response.status}`);
+    async function loadCampaignMembers() {
+      if (!session || !selectedEventId) {
+        setCampaignMembers([]);
+        return;
       }
 
-      const data = await response.json();
-      setCampaignMembers(data.results || []);
-    } catch (error) {
-      console.error("Failed to load campaign members:", error);
-      setCampaignMembersError(
-        "Could not load campaign contacts from the private Sheet."
-      );
-      setCampaignMembers([]);
-    } finally {
-      setIsLoadingCampaignMembers(false);
-    }
-  }
+      setIsLoadingCampaignMembers(true);
+      setCampaignMembersError("");
 
-  loadCampaignMembers();
-}, [selectedEventId, campaignMemberStatusFilter]);
+      try {
+        const statusQuery =
+          campaignMemberStatusFilter === "all"
+            ? ""
+            : `&status=${encodeURIComponent(campaignMemberStatusFilter)}`;
+
+        const response = await fetch(
+          `/api/campaign-members?campaignId=${encodeURIComponent(
+            selectedEventId
+          )}${statusQuery}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Campaign members request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setCampaignMembers(data.results || []);
+      } catch (error) {
+        console.error("Failed to load campaign members:", error);
+        setCampaignMembersError(
+          "Could not load campaign contacts from the private Sheet."
+        );
+        setCampaignMembers([]);
+      } finally {
+        setIsLoadingCampaignMembers(false);
+      }
+    }
+
+    loadCampaignMembers();
+  }, [session, selectedEventId, campaignMemberStatusFilter]);
 
   const selectedEvent =
     events.find((event) => event.id === selectedEventId) || events[0] || null;
@@ -534,55 +567,57 @@ export default function Home() {
   }
 
   function openOrAttachCampaignMember(member: CampaignMember) {
-  if (!selectedEvent) {
-    alert("Choose an event before opening a campaign contact.");
-    return;
+    if (!selectedEvent) {
+      alert("Choose an event before opening a campaign contact.");
+      return;
+    }
+
+    const existingContact = eventContacts.find(
+      (contact) => contact.salesforceContactId === member.salesforceContactId
+    );
+
+    if (existingContact) {
+      setSelectedId(existingContact.id);
+      return;
+    }
+
+    const newContact: Contact = {
+      id: `${Date.now()}-${member.salesforceContactId}`,
+      eventId: selectedEvent.id,
+      eventName: selectedEvent.name,
+      salesforceContactId: member.salesforceContactId,
+      name: member.name,
+      email: member.email,
+      company: member.company || "Unknown account",
+      title: member.title || "No title",
+      accountOwnerUserId: member.accountOwnerEmail
+        ? `owner-${member.accountOwnerEmail
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")}`
+        : "unknown-owner",
+      accountOwnerName: member.accountOwnerName,
+      accountOwnerEmail: member.accountOwnerEmail,
+      source: member.source,
+      addedByUserId: currentUser.id,
+      addedAt: nowLabel(),
+      notes: [
+        {
+          id: `${Date.now()}-campaign-member-note`,
+          text: `Added from campaign member list. Campaign status: ${
+            member.memberStatus || "N/A"
+          }. Email: ${member.email || "N/A"}.`,
+          createdByUserId: currentUser.id,
+          createdAt: nowLabel(),
+        },
+      ],
+      followups: [],
+      tags: [],
+      emailDrafts: [],
+    };
+
+    setContacts([newContact, ...contacts]);
+    setSelectedId(newContact.id);
   }
-
-  const existingContact = eventContacts.find(
-    (contact) => contact.salesforceContactId === member.salesforceContactId
-  );
-
-  if (existingContact) {
-    setSelectedId(existingContact.id);
-    return;
-  }
-
-  const newContact: Contact = {
-    id: `${Date.now()}-${member.salesforceContactId}`,
-    eventId: selectedEvent.id,
-    eventName: selectedEvent.name,
-    salesforceContactId: member.salesforceContactId,
-    name: member.name,
-    email: member.email,
-    company: member.company || "Unknown account",
-    title: member.title || "No title",
-    accountOwnerUserId: member.accountOwnerEmail
-      ? `owner-${member.accountOwnerEmail.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
-      : "unknown-owner",
-    accountOwnerName: member.accountOwnerName,
-    accountOwnerEmail: member.accountOwnerEmail,
-    source: member.source,
-    addedByUserId: currentUser.id,
-    addedAt: nowLabel(),
-    notes: [
-      {
-        id: `${Date.now()}-campaign-member-note`,
-        text: `Added from campaign member list. Campaign status: ${
-          member.memberStatus || "N/A"
-        }. Email: ${member.email || "N/A"}.`,
-        createdByUserId: currentUser.id,
-        createdAt: nowLabel(),
-      },
-    ],
-    followups: [],
-    tags: [],
-    emailDrafts: [],
-  };
-
-  setContacts([newContact, ...contacts]);
-  setSelectedId(newContact.id);
-}
 
   function removeEventContact(contactId: string) {
     const contactToRemove = contacts.find((contact) => contact.id === contactId);
@@ -757,14 +792,15 @@ export default function Home() {
       ],
     });
   }
+
   function generateFollowUpDraft() {
-  if (!selected || !selectedEvent) return;
+    if (!selected || !selectedEvent) return;
 
-  const firstName = selected.name.split(" ")[0] || selected.name;
+    const firstName = selected.name.split(" ")[0] || selected.name;
 
-  const subject = `Great connecting at ${selectedEvent.name}`;
+    const subject = `Great connecting at ${selectedEvent.name}`;
 
-  const body = `Hi ${firstName},
+    const body = `Hi ${firstName},
 
 Great connecting around ${selectedEvent.name}. I wanted to follow up while the conversation was still fresh.
 
@@ -775,102 +811,135 @@ Happy to send over a few relevant examples or set up time with the right Kargo t
 Best,
 ${currentUser.name}`;
 
-  setDraftSubject(subject);
-  setDraftBody(body);
-}
-
-function saveEmailDraft() {
-  if (!selected) return;
-
-  if (!selected.email) {
-    alert("This contact does not have an email address.");
-    return;
+    setDraftSubject(subject);
+    setDraftBody(body);
   }
 
-  if (!draftSubject.trim() || !draftBody.trim()) {
-    alert("Generate or write a subject and body first.");
-    return;
+  function saveEmailDraft() {
+    if (!selected) return;
+
+    if (!selected.email) {
+      alert("This contact does not have an email address.");
+      return;
+    }
+
+    if (!draftSubject.trim() || !draftBody.trim()) {
+      alert("Generate or write a subject and body first.");
+      return;
+    }
+
+    const newDraft: EmailDraft = {
+      id: String(Date.now()),
+      subject: draftSubject.trim(),
+      body: draftBody.trim(),
+      status: "draft",
+      recipientEmail: selected.email,
+      createdByUserId: currentUser.id,
+      createdAt: nowLabel(),
+    };
+
+    updateSelectedContact({
+      ...selected,
+      emailDrafts: [newDraft, ...selected.emailDrafts],
+    });
+
+    setDraftSubject("");
+    setDraftBody("");
   }
 
-  const newDraft: EmailDraft = {
-    id: String(Date.now()),
-    subject: draftSubject.trim(),
-    body: draftBody.trim(),
-    status: "draft",
-    recipientEmail: selected.email,
-    createdByUserId: currentUser.id,
-    createdAt: nowLabel(),
-  };
+  async function copyEmailDraft(draft: EmailDraft) {
+    if (!selected) return;
 
-  updateSelectedContact({
-    ...selected,
-    emailDrafts: [newDraft, ...selected.emailDrafts],
-  });
-
-  setDraftSubject("");
-  setDraftBody("");
-}
-
-async function copyEmailDraft(draft: EmailDraft) {
-  const text = `To: ${draft.recipientEmail}
+    const text = `To: ${draft.recipientEmail}
 Subject: ${draft.subject}
 
 ${draft.body}`;
 
-  await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(text);
 
-  updateSelectedContact({
-    ...selected,
-    emailDrafts: selected.emailDrafts.map((item) =>
-      item.id === draft.id ? { ...item, status: "copied" } : item
-    ),
-  });
+    updateSelectedContact({
+      ...selected,
+      emailDrafts: selected.emailDrafts.map((item) =>
+        item.id === draft.id ? { ...item, status: "copied" } : item
+      ),
+    });
 
-  alert("Email draft copied.");
-}
+    alert("Email draft copied.");
+  }
 
-function markDraftSent(draftId: string) {
-  if (!selected) return;
+  function markDraftSent(draftId: string) {
+    if (!selected) return;
 
-  updateSelectedContact({
-    ...selected,
-    emailDrafts: selected.emailDrafts.map((draft) =>
-      draft.id === draftId
-        ? {
-            ...draft,
-            status: "sent",
-            sentAt: nowLabel(),
-            salesforceEmailLink: salesforceEmailLink.trim() || draft.salesforceEmailLink,
-          }
-        : draft
-    ),
-  });
+    updateSelectedContact({
+      ...selected,
+      emailDrafts: selected.emailDrafts.map((draft) =>
+        draft.id === draftId
+          ? {
+              ...draft,
+              status: "sent",
+              sentAt: nowLabel(),
+              salesforceEmailLink:
+                salesforceEmailLink.trim() || draft.salesforceEmailLink,
+            }
+          : draft
+      ),
+    });
 
-  setSalesforceEmailLink("");
-}
+    setSalesforceEmailLink("");
+  }
 
-function deleteEmailDraft(draftId: string) {
-  if (!selected) return;
+  function deleteEmailDraft(draftId: string) {
+    if (!selected) return;
 
-  updateSelectedContact({
-    ...selected,
-    emailDrafts: selected.emailDrafts.filter((draft) => draft.id !== draftId),
-  });
-}
+    updateSelectedContact({
+      ...selected,
+      emailDrafts: selected.emailDrafts.filter((draft) => draft.id !== draftId),
+    });
+  }
 
   function resetPrototypeData() {
     const confirmReset = window.confirm(
-      "Reset prototype data? This will clear saved local browser data."
+      "Reset your prototype data? This will clear saved local browser data for your signed-in account."
     );
 
     if (!confirmReset) return;
 
-    window.localStorage.removeItem("kargo-event-hub-contacts");
+    if (storageKey) {
+      window.localStorage.removeItem(storageKey);
+    }
+
     setContacts([]);
     setSelectedId("");
     setSelectedTagUserId("none");
     setSalesforceResults([]);
     setSearch("");
+  }
+
+  if (status === "loading") {
+    return <main className="app">Loading...</main>;
+  }
+
+  if (!session) {
+    return (
+      <main className="app">
+        <section className="hero">
+          <div>
+            <p className="eyebrow">Kargo Internal Prototype</p>
+            <h1>Kargo Event Hub</h1>
+            <p>Sign in with your Kargo Google account to continue.</p>
+          </div>
+
+          <div className="userBar">
+            <div>
+              <strong>Secure access required</strong>
+              <span>Only @kargo.com Google accounts can access this workspace.</span>
+            </div>
+
+            <button onClick={() => signIn("google")}>Sign in with Google</button>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -925,7 +994,11 @@ function deleteEmailDraft(draftId: string) {
               {currentUser.role} · {currentUser.team} · {currentUser.email}
             </span>
           </div>
-          <button onClick={resetPrototypeData}>Reset prototype data</button>
+
+          <div className="miniActions">
+            <button onClick={resetPrototypeData}>Reset my prototype data</button>
+            <button onClick={() => signOut()}>Sign out</button>
+          </div>
         </div>
       </section>
 
@@ -973,143 +1046,151 @@ function deleteEmailDraft(draftId: string) {
 
       <div className="grid">
         <section className="panel">
-         <h2>Campaign contacts</h2>
-<p className="muted">
-  Showing contacts tied to {selectedEvent?.name || "the selected campaign"} from
-  the private campaign member Sheet.
-</p>
+          <h2>Campaign contacts</h2>
+          <p className="muted">
+            Showing contacts tied to {selectedEvent?.name || "the selected campaign"} from
+            the private campaign member Sheet.
+          </p>
 
-<div className="statusFilterRow">
-  {campaignMemberStatusOptions.map((option) => (
-    <button
-      key={option.value}
-      className={
-        campaignMemberStatusFilter === option.value
-          ? "filterChip active"
-          : "filterChip"
-      }
-      onClick={() => setCampaignMemberStatusFilter(option.value)}
-    >
-      {option.label}
-    </button>
-  ))}
-</div>
-
-{isLoadingCampaignMembers && (
-  <p className="empty">Loading campaign contacts...</p>
-)}
-
-{campaignMembersError && <p className="errorText">{campaignMembersError}</p>}
-
-{!isLoadingCampaignMembers &&
-  !campaignMembersError &&
-  campaignMembers.length === 0 && (
-    <p className="empty">
-      No campaign contacts found for this event and filter.
-    </p>
-  )}
-
-{campaignMembers.length > 0 && (
-  <div className="campaignMembersList">
-    {campaignMembers.map((member) => {
-      const alreadyAttached = eventContacts.some(
-        (contact) => contact.salesforceContactId === member.salesforceContactId
-      );
-
-      return (
-        <div
-          key={member.memberId || member.salesforceContactId}
-          className="campaignMemberCard"
-        >
-          <button
-            className="campaignMemberMain"
-            onClick={() => openOrAttachCampaignMember(member)}
-          >
-            <div className="avatar">{getInitials(member.name || "NA")}</div>
-
-            <div>
-              <div className="campaignMemberHeader">
-                <strong>{member.name || "Unnamed contact"}</strong>
-                <span className={getStatusClass(member.memberStatus)}>
-                  {getStatusLabel(member.memberStatus)}
-                </span>
-              </div>
-
-              <span>
-                {member.company || "No account"} · {member.title || "No title"}
-              </span>
-
-              <small>
-                {member.email || "No email"} · Account owner:{" "}
-                {member.accountOwnerName || "Unknown"}
-              </small>
-            </div>
-          </button>
-
-          <button
-            className={alreadyAttached ? "attachedButton" : "attachMemberButton"}
-            onClick={() => openOrAttachCampaignMember(member)}
-          >
-            {alreadyAttached ? "Open" : "Add"}
-          </button>
-        </div>
-      );
-    })}
-  </div>
-)}
-<div className="manualSearchBox">
-  <h3>Manual add</h3>
-  <p className="muted">
-    Search all Salesforce contacts only if someone is missing from the campaign
-    member list.
-  </p>
-
-  <div className="searchRow">
-    <input
-      value={search}
-      onChange={(e) => setSearch(e.target.value)}
-      placeholder="Search all Salesforce contacts"
-    />
-    <button onClick={searchSalesforce}>
-      {isSearchingSalesforce ? "Searching..." : "Search"}
-    </button>
-  </div>
-
-  {salesforceResults.length > 0 && (
-    <div className="searchResultsWrap">
-      <div className="resultsHeader">
-        <strong>
-          {salesforceResults.length} Salesforce result
-          {salesforceResults.length === 1 ? "" : "s"}
-        </strong>
-        <button onClick={() => setSalesforceResults([])}>Clear results</button>
-      </div>
-
-      <div className="salesforceResults">
-        {salesforceResults.map((result) => (
-          <div key={result.salesforceContactId} className="salesforceResult">
-            <div>
-              <strong>{result.name}</strong>
-              <span>
-                {result.company || "No account"} ·{" "}
-                {result.title || "No title"}
-              </span>
-              <small>
-                {result.email || "No email"} · Account owner:{" "}
-                {result.accountOwnerName ||
-                  getUserName(result.accountOwnerUserId)}
-              </small>
-            </div>
-
-            <button onClick={() => attachSalesforceContact(result)}>
-              Attach to event
-            </button>
+          <div className="statusFilterRow">
+            {campaignMemberStatusOptions.map((option) => (
+              <button
+                key={option.value}
+                className={
+                  campaignMemberStatusFilter === option.value
+                    ? "filterChip active"
+                    : "filterChip"
+                }
+                onClick={() => setCampaignMemberStatusFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
-  )}
-</div>
+
+          {isLoadingCampaignMembers && (
+            <p className="empty">Loading campaign contacts...</p>
+          )}
+
+          {campaignMembersError && <p className="errorText">{campaignMembersError}</p>}
+
+          {!isLoadingCampaignMembers &&
+            !campaignMembersError &&
+            campaignMembers.length === 0 && (
+              <p className="empty">
+                No campaign contacts found for this event and filter.
+              </p>
+            )}
+
+          {campaignMembers.length > 0 && (
+            <div className="campaignMembersList">
+              {campaignMembers.map((member) => {
+                const alreadyAttached = eventContacts.some(
+                  (contact) =>
+                    contact.salesforceContactId === member.salesforceContactId
+                );
+
+                return (
+                  <div
+                    key={member.memberId || member.salesforceContactId}
+                    className="campaignMemberCard"
+                  >
+                    <button
+                      className="campaignMemberMain"
+                      onClick={() => openOrAttachCampaignMember(member)}
+                    >
+                      <div className="avatar">{getInitials(member.name || "NA")}</div>
+
+                      <div>
+                        <div className="campaignMemberHeader">
+                          <strong>{member.name || "Unnamed contact"}</strong>
+                          <span className={getStatusClass(member.memberStatus)}>
+                            {getStatusLabel(member.memberStatus)}
+                          </span>
+                        </div>
+
+                        <span>
+                          {member.company || "No account"} ·{" "}
+                          {member.title || "No title"}
+                        </span>
+
+                        <small>
+                          {member.email || "No email"} · Account owner:{" "}
+                          {member.accountOwnerName || "Unknown"}
+                        </small>
+                      </div>
+                    </button>
+
+                    <button
+                      className={
+                        alreadyAttached ? "attachedButton" : "attachMemberButton"
+                      }
+                      onClick={() => openOrAttachCampaignMember(member)}
+                    >
+                      {alreadyAttached ? "Open" : "Add"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="manualSearchBox">
+            <h3>Manual add</h3>
+            <p className="muted">
+              Search all Salesforce contacts only if someone is missing from the campaign
+              member list.
+            </p>
+
+            <div className="searchRow">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search all Salesforce contacts"
+              />
+              <button onClick={searchSalesforce}>
+                {isSearchingSalesforce ? "Searching..." : "Search"}
+              </button>
+            </div>
+
+            {salesforceResults.length > 0 && (
+              <div className="searchResultsWrap">
+                <div className="resultsHeader">
+                  <strong>
+                    {salesforceResults.length} Salesforce result
+                    {salesforceResults.length === 1 ? "" : "s"}
+                  </strong>
+                  <button onClick={() => setSalesforceResults([])}>
+                    Clear results
+                  </button>
+                </div>
+
+                <div className="salesforceResults">
+                  {salesforceResults.map((result) => (
+                    <div key={result.salesforceContactId} className="salesforceResult">
+                      <div>
+                        <strong>{result.name}</strong>
+                        <span>
+                          {result.company || "No account"} ·{" "}
+                          {result.title || "No title"}
+                        </span>
+                        <small>
+                          {result.email || "No email"} · Account owner:{" "}
+                          {result.accountOwnerName ||
+                            getUserName(result.accountOwnerUserId, allUsers)}
+                        </small>
+                      </div>
+
+                      <button onClick={() => attachSalesforceContact(result)}>
+                        Attach to event
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <h2>Event contacts</h2>
           <p className="muted">
             Each contact is linked to {selectedEvent?.name || "this event"} and
@@ -1120,8 +1201,7 @@ function deleteEmailDraft(draftId: string) {
           <div className="contacts">
             {eventContacts.length === 0 && (
               <p className="empty">
-                No contacts attached to{" "}
-                {selectedEvent?.name || "this event"} yet.
+                No contacts attached to {selectedEvent?.name || "this event"} yet.
               </p>
             )}
 
@@ -1141,10 +1221,10 @@ function deleteEmailDraft(draftId: string) {
                       {contact.company} · {contact.title}
                     </span>
                     <small>
-                      Added by {getUserName(contact.addedByUserId)} · Account
+                      Added by {getUserName(contact.addedByUserId, allUsers)} · Account
                       owner:{" "}
                       {contact.accountOwnerName ||
-                        getUserName(contact.accountOwnerUserId)}
+                        getUserName(contact.accountOwnerUserId, allUsers)}
                     </small>
                   </div>
                 </button>
@@ -1179,11 +1259,11 @@ function deleteEmailDraft(draftId: string) {
 
               <div className="pillRow">
                 <span>{selected.source}</span>
-                <span>Added by: {getUserName(selected.addedByUserId)}</span>
+                <span>Added by: {getUserName(selected.addedByUserId, allUsers)}</span>
                 <span>
                   Account owner:{" "}
                   {selected.accountOwnerName ||
-                    getUserName(selected.accountOwnerUserId)}
+                    getUserName(selected.accountOwnerUserId, allUsers)}
                 </span>
               </div>
 
@@ -1247,41 +1327,41 @@ function deleteEmailDraft(draftId: string) {
                   <button onClick={importGranola}>Import Granola</button>
                 </div>
               </div>
-                <div className="emailDraftBox">
-  <div>
-    <strong>Follow-up email</strong>
-    <p>
-      Draft a follow-up to {selected.email || "this contact"}. Copy it into
-      Gmail/Outlook for now, then mark it sent and paste the Salesforce/Weflow
-      link when available.
-    </p>
-  </div>
 
-  <div className="emailMeta">
-    <span>To: {selected.email || "No email available"}</span>
-  </div>
+              <div className="emailDraftBox">
+                <div>
+                  <strong>Follow-up email</strong>
+                  <p>
+                    Draft a follow-up to {selected.email || "this contact"}. Copy it into
+                    Gmail/Outlook for now, then mark it sent and paste the Salesforce/Weflow
+                    link when available.
+                  </p>
+                </div>
 
-  <button onClick={generateFollowUpDraft} disabled={!selected.email}>
-    Generate draft
-  </button>
+                <div className="emailMeta">
+                  <span>To: {selected.email || "No email available"}</span>
+                </div>
 
-  <input
-    value={draftSubject}
-    onChange={(e) => setDraftSubject(e.target.value)}
-    placeholder="Email subject"
-  />
+                <button onClick={generateFollowUpDraft} disabled={!selected.email}>
+                  Generate draft
+                </button>
 
-  <textarea
-    value={draftBody}
-    onChange={(e) => setDraftBody(e.target.value)}
-    placeholder="Email body"
-  />
+                <input
+                  value={draftSubject}
+                  onChange={(e) => setDraftSubject(e.target.value)}
+                  placeholder="Email subject"
+                />
 
-  <button onClick={saveEmailDraft} disabled={!selected.email}>
-    Save email draft
-  </button>
-</div>
+                <textarea
+                  value={draftBody}
+                  onChange={(e) => setDraftBody(e.target.value)}
+                  placeholder="Email body"
+                />
 
+                <button onClick={saveEmailDraft} disabled={!selected.email}>
+                  Save email draft
+                </button>
+              </div>
 
               <div className="sections">
                 <div>
@@ -1296,9 +1376,7 @@ function deleteEmailDraft(draftId: string) {
                         <>
                           <textarea
                             value={editingNoteText}
-                            onChange={(e) =>
-                              setEditingNoteText(e.target.value)
-                            }
+                            onChange={(e) => setEditingNoteText(e.target.value)}
                           />
                           <div className="miniActions">
                             <button onClick={saveEditedNote}>Save edit</button>
@@ -1311,7 +1389,7 @@ function deleteEmailDraft(draftId: string) {
                         <>
                           <p>{note.text}</p>
                           <small>
-                            Created by {getUserName(note.createdByUserId)} ·{" "}
+                            Created by {getUserName(note.createdByUserId, allUsers)} ·{" "}
                             {note.createdAt}
                           </small>
                           <div className="miniActions">
@@ -1338,8 +1416,8 @@ function deleteEmailDraft(draftId: string) {
                     <div key={followup.id} className="item">
                       <p>{followup.text}</p>
                       <small>
-                        Created by {getUserName(followup.createdByUserId)} ·
-                        Assigned to {getUserName(followup.assignedToUserId)} ·{" "}
+                        Created by {getUserName(followup.createdByUserId, allUsers)} ·
+                        Assigned to {getUserName(followup.assignedToUserId, allUsers)} ·{" "}
                         {followup.createdAt}
                       </small>
                       <div className="miniActions">
@@ -1362,9 +1440,9 @@ function deleteEmailDraft(draftId: string) {
                   {selected.tags.map((tag) => (
                     <div key={tag.id} className="item tagItem">
                       <div>
-                        <p>{getUserName(tag.taggedUserId)}</p>
+                        <p>{getUserName(tag.taggedUserId, allUsers)}</p>
                         <small>
-                          Tagged by {getUserName(tag.taggedByUserId)} ·{" "}
+                          Tagged by {getUserName(tag.taggedByUserId, allUsers)} ·{" "}
                           {tag.createdAt}
                         </small>
                       </div>
@@ -1372,54 +1450,65 @@ function deleteEmailDraft(draftId: string) {
                     </div>
                   ))}
                 </div>
-<div>
-  <h3>Follow-up email drafts</h3>
 
-  {selected.emailDrafts.length === 0 && (
-    <p className="empty">No email drafts yet.</p>
-  )}
+                <div>
+                  <h3>Follow-up email drafts</h3>
 
-  {selected.emailDrafts.map((draft) => (
-    <div key={draft.id} className="item emailDraftItem">
-      <div className="emailDraftHeader">
-        <strong>{draft.subject}</strong>
-        <span className={`emailStatus ${draft.status}`}>{draft.status}</span>
-      </div>
+                  {selected.emailDrafts.length === 0 && (
+                    <p className="empty">No email drafts yet.</p>
+                  )}
 
-      <small>
-        To: {draft.recipientEmail} · Created by{" "}
-        {getUserName(draft.createdByUserId)} · {draft.createdAt}
-      </small>
+                  {selected.emailDrafts.map((draft) => (
+                    <div key={draft.id} className="item emailDraftItem">
+                      <div className="emailDraftHeader">
+                        <strong>{draft.subject}</strong>
+                        <span className={`emailStatus ${draft.status}`}>
+                          {draft.status}
+                        </span>
+                      </div>
 
-      <p className="emailBodyPreview">{draft.body}</p>
+                      <small>
+                        To: {draft.recipientEmail} · Created by{" "}
+                        {getUserName(draft.createdByUserId, allUsers)} ·{" "}
+                        {draft.createdAt}
+                      </small>
 
-      {draft.sentAt && <small>Sent at: {draft.sentAt}</small>}
+                      <p className="emailBodyPreview">{draft.body}</p>
 
-      {draft.salesforceEmailLink && (
-        <small>
-          Salesforce/Weflow link:{" "}
-          <a href={draft.salesforceEmailLink} target="_blank">
-            Open logged email
-          </a>
-        </small>
-      )}
+                      {draft.sentAt && <small>Sent at: {draft.sentAt}</small>}
 
-      <div className="salesforceLinkRow">
-        <input
-          value={salesforceEmailLink}
-          onChange={(e) => setSalesforceEmailLink(e.target.value)}
-          placeholder="Paste Salesforce/Weflow email link before marking sent"
-        />
-      </div>
+                      {draft.salesforceEmailLink && (
+                        <small>
+                          Salesforce/Weflow link:{" "}
+                          <a href={draft.salesforceEmailLink} target="_blank">
+                            Open logged email
+                          </a>
+                        </small>
+                      )}
 
-      <div className="miniActions">
-        <button onClick={() => copyEmailDraft(draft)}>Copy draft</button>
-        <button onClick={() => markDraftSent(draft.id)}>Mark sent</button>
-        <button onClick={() => deleteEmailDraft(draft.id)}>Delete</button>
-      </div>
-    </div>
-  ))}
-</div>
+                      <div className="salesforceLinkRow">
+                        <input
+                          value={salesforceEmailLink}
+                          onChange={(e) => setSalesforceEmailLink(e.target.value)}
+                          placeholder="Paste Salesforce/Weflow email link before marking sent"
+                        />
+                      </div>
+
+                      <div className="miniActions">
+                        <button onClick={() => copyEmailDraft(draft)}>
+                          Copy draft
+                        </button>
+                        <button onClick={() => markDraftSent(draft.id)}>
+                          Mark sent
+                        </button>
+                        <button onClick={() => deleteEmailDraft(draft.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 <div>
                   <h3>Who is meeting with whom?</h3>
                   <div className="relationshipList">
@@ -1427,17 +1516,15 @@ function deleteEmailDraft(draftId: string) {
                       <p className="empty">No contacts added for this event yet.</p>
                     )}
 
-                    {Object.entries(contactsAddedByUser).map(
-                      ([userId, count]) => (
-                        <div key={userId} className="relationshipRow">
-                          <strong>{getUserName(userId)}</strong>
-                          <span>
-                            added {count} contact{count === 1 ? "" : "s"} to{" "}
-                            {selectedEvent?.name || "this event"}
-                          </span>
-                        </div>
-                      )
-                    )}
+                    {Object.entries(contactsAddedByUser).map(([userId, count]) => (
+                      <div key={userId} className="relationshipRow">
+                        <strong>{getUserName(userId, allUsers)}</strong>
+                        <span>
+                          added {count} contact{count === 1 ? "" : "s"} to{" "}
+                          {selectedEvent?.name || "this event"}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
