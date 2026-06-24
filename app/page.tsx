@@ -255,6 +255,7 @@ export default function Home() {
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [eventsError, setEventsError] = useState("");
   const [campaignMembers, setCampaignMembers] = useState<CampaignMember[]>([]);
+  const [campaignMemberSearch, setCampaignMemberSearch] = useState("");
   const [campaignMemberStatusFilter, setCampaignMemberStatusFilter] =
     useState("all");
   const [isLoadingCampaignMembers, setIsLoadingCampaignMembers] =
@@ -413,6 +414,22 @@ const filteredEvents = events.filter((event) => {
 
   const selectedEvent =
     events.find((event) => event.id === selectedEventId) || events[0] || null;
+
+  const filteredCampaignMembers = campaignMembers.filter((member) => {
+  const searchable = [
+    member.name,
+    member.email,
+    member.company,
+    member.title,
+    member.memberStatus,
+    member.accountOwnerName,
+    member.accountOwnerEmail,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return searchable.includes(campaignMemberSearch.toLowerCase());
+});
 
   const eventContacts = selectedEvent
     ? contacts.filter((contact) => contact.eventId === selectedEvent.id)
@@ -1033,7 +1050,13 @@ ${draft.body}`;
             Showing contacts tied to {selectedEvent?.name || "the selected campaign"} from
             the private campaign member Sheet.
           </p>
-
+          <div className="campaignContactSearch">
+  <input
+    value={campaignMemberSearch}
+    onChange={(e) => setCampaignMemberSearch(e.target.value)}
+    placeholder="Search campaign contacts by name, company, title, email, or owner"
+  />
+</div>
           <div className="statusFilterRow">
             {campaignMemberStatusOptions.map((option) => (
               <button
@@ -1058,15 +1081,15 @@ ${draft.body}`;
 
           {!isLoadingCampaignMembers &&
             !campaignMembersError &&
-            campaignMembers.length === 0 && (
+            filteredCampaignMembers.length === 0 && (
               <p className="empty">
                 No campaign contacts found for this event and filter.
               </p>
             )}
 
-          {campaignMembers.length > 0 && (
+          {filteredCampaignMembers.length > 0 && (
             <div className="campaignMembersList">
-              {campaignMembers.map((member) => {
+              {filteredCampaignMembers.map((member) => {
                 const alreadyAttached = eventContacts.some(
                   (contact) =>
                     contact.salesforceContactId === member.salesforceContactId
@@ -1120,8 +1143,7 @@ ${draft.body}`;
           <div className="manualSearchBox">
             <h3>Manual add</h3>
             <p className="muted">
-              Search all Salesforce contacts only if someone is missing from the campaign
-              member list.
+              Search all contacts if someone is missing from the campaign member list.
             </p>
 
             <div className="searchRow">
@@ -1175,9 +1197,7 @@ ${draft.body}`;
 
           <h2>Event contacts</h2>
           <p className="muted">
-            Each contact is linked to {selectedEvent?.name || "this event"} and
-            tracks who added them, their Salesforce account owner, notes,
-            follow-ups, and teammate tags.
+            Each contact is linked to {selectedEvent?.name || "this event"}
           </p>
 
           <div className="contacts">
