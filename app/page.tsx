@@ -1309,10 +1309,9 @@ ${draft.body}`;
                 <div className="tagBox">
                   <div className="tagBoxHeader">
                     <div>
-                      <strong>Tag active sales rep</strong>
+                      <strong>Tag Teammate</strong>
                       <p>
-                        Choose one rep to loop in, or leave as none for a 1:1
-                        meeting.
+                        Loop in a teammate
                       </p>
                     </div>
                   </div>
@@ -1324,7 +1323,7 @@ ${draft.body}`;
       setSellerSearch(e.target.value);
       setSelectedTagUserId("none");
     }}
-    placeholder="Search sellers by name, email, team, or region"
+    placeholder="Search Teammates"
   />
 
   {usersError && <p className="errorText">{usersError}</p>}
@@ -1363,7 +1362,7 @@ ${draft.body}`;
     onClick={tagSelectedTeammate}
     disabled={selectedTagUserId === "none"}
   >
-    Add selected seller tag
+    Add Teammate
   </button>
 </div>
 </div>
@@ -1480,7 +1479,7 @@ ${draft.body}`;
                   <h3>Team tags</h3>
                   {selected.tags.length === 0 && (
                     <p className="empty">
-                      No teammate tags. This can be a 1:1 meeting.
+                      No teammates tagged yet.
                     </p>
                   )}
 
