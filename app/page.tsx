@@ -1013,10 +1013,6 @@ ${draft.body}`;
 
       <section className="metrics">
         <div>
-          <span>Event</span>
-          <strong>{selectedEvent?.name || "No event selected"}</strong>
-        </div>
-        <div>
           <span>Event contacts</span>
           <strong>{eventContacts.length}</strong>
         </div>
@@ -1027,29 +1023,6 @@ ${draft.body}`;
         <div>
           <span>Event teammate tags</span>
           <strong>{eventTags}</strong>
-        </div>
-      </section>
-
-      <section className="metrics secondaryMetrics">
-        <div>
-          <span>Unique accounts</span>
-          <strong>{uniqueAccounts}</strong>
-        </div>
-        <div>
-          <span>My contacts added</span>
-          <strong>{myContacts.length}</strong>
-        </div>
-        <div>
-          <span>Selected contact follow-ups</span>
-          <strong>{selected?.followups.length || 0}</strong>
-        </div>
-        <div>
-          <span>Selected contact tags</span>
-          <strong>{selected?.tags.length || 0}</strong>
-        </div>
-        <div>
-          <span>Data status</span>
-          <strong>Local saved</strong>
         </div>
       </section>
 
