@@ -1053,3 +1053,45 @@ button:disabled {
     width: 100%;
   }
 }
+.sellerSearchBox {
+  display: grid;
+  gap: 10px;
+}
+
+.sellerResults {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.sellerResult {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  text-align: left;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 10px;
+}
+
+.sellerResult:hover {
+  transform: none;
+  border-color: rgba(49, 93, 255, 0.4);
+}
+
+.sellerResult.active {
+  background: #f8fbff;
+  border-color: rgba(49, 93, 255, 0.7);
+  box-shadow: 0 0 0 4px rgba(49, 93, 255, 0.08);
+}
+
+.sellerResult span,
+.sellerResult small {
+  display: block;
+  color: var(--muted);
+  margin-top: 2px;
+}

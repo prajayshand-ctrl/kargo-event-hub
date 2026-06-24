@@ -139,65 +139,9 @@ function buildCurrentUser(sessionUser?: {
   };
 }
 
-const activeSalesReps: UserProfile[] = [
-  {
-    id: "user-aurelio",
-    name: "Aurelio Farrell",
-    email: "aurelio.farrell@kargo.com",
-    role: "Seller",
-    team: "Brand Sales",
-    region: "US",
-    salesforceUserId: "005-aurelio-placeholder",
-    slackUserId: "U-aurelio-placeholder",
-    active: true,
-  },
-  {
-    id: "user-clarke",
-    name: "Clarke Johnson",
-    email: "clarke.johnson@kargo.com",
-    role: "Seller",
-    team: "Brand Sales",
-    region: "US",
-    salesforceUserId: "005-clarke-placeholder",
-    slackUserId: "U-clarke-placeholder",
-    active: true,
-  },
-  {
-    id: "user-dani",
-    name: "Dani Halle",
-    email: "dani.halle@kargo.com",
-    role: "Seller",
-    team: "Brand Sales",
-    region: "US",
-    salesforceUserId: "005-dani-placeholder",
-    slackUserId: "U-dani-placeholder",
-    active: true,
-  },
-  {
-    id: "user-jerry",
-    name: "Jerry Gehrung",
-    email: "jerry.gehrung@kargo.com",
-    role: "Seller",
-    team: "Brand Sales",
-    region: "US",
-    salesforceUserId: "005-jerry-placeholder",
-    slackUserId: "U-jerry-placeholder",
-    active: true,
-  },
-  {
-    id: "user-naina",
-    name: "Naina Thangada",
-    email: "naina.thangada@kargo.com",
-    role: "Seller",
-    team: "Brand Sales",
-    region: "US",
-    salesforceUserId: "005-naina-placeholder",
-    slackUserId: "U-naina-placeholder",
-    active: true,
-  },
-];
+const fallbackActiveSalesReps: UserProfile[] = [];
 
-function getAllUsers(currentUser: UserProfile) {
+function getAllUsers(currentUser: UserProfile, activeSalesReps: UserProfile[]) {
   const hasCurrentUser = activeSalesReps.some(
     (user) => user.email.toLowerCase() === currentUser.email.toLowerCase()
   );
@@ -316,13 +260,28 @@ export default function Home() {
   const [isLoadingCampaignMembers, setIsLoadingCampaignMembers] =
     useState(false);
   const [campaignMembersError, setCampaignMembersError] = useState("");
-
+const [activeSalesReps, setActiveSalesReps] = useState<UserProfile[]>(
+  fallbackActiveSalesReps
+);
+const [sellerSearch, setSellerSearch] = useState("");
+const [usersError, setUsersError] = useState("");
   const currentUser = useMemo(
     () => buildCurrentUser(session?.user),
     [session?.user]
   );
 
-  const allUsers = useMemo(() => getAllUsers(currentUser), [currentUser]);
+  const allUsers = useMemo(
+  () => getAllUsers(currentUser, activeSalesReps),
+  [currentUser, activeSalesReps]
+);
+
+const filteredSalesReps = activeSalesReps.filter((rep) => {
+  const searchable = [rep.name, rep.email, rep.role, rep.team, rep.region]
+    .join(" ")
+    .toLowerCase();
+
+  return searchable.includes(sellerSearch.toLowerCase());
+});
 
   const storageKey = currentUser.email
     ? `kargo-event-hub:${currentUser.email}:contacts`
@@ -473,6 +432,31 @@ const filteredEvents = events.filter((event) => {
       setSelectedId(eventContacts[0]?.id || "");
     }
   }, [selectedEventId, contacts, selectedEvent, eventContacts, selectedId]);
+
+  useEffect(() => {
+  if (!session) return;
+
+  async function loadUsers() {
+    setUsersError("");
+
+    try {
+      const response = await fetch("/api/users");
+
+      if (!response.ok) {
+        throw new Error(`Users request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setActiveSalesReps(data.results || []);
+    } catch (error) {
+      console.error("Failed to load active users:", error);
+      setUsersError("Could not load active sellers.");
+      setActiveSalesReps([]);
+    }
+  }
+
+  loadUsers();
+}, [session]);
 
   const eventFollowups = eventContacts.reduce(
     (sum, contact) => sum + contact.followups.length,
@@ -1333,26 +1317,56 @@ ${draft.body}`;
                     </div>
                   </div>
 
-                  <div className="tagDropdownRow">
-                    <select
-                      value={selectedTagUserId}
-                      onChange={(e) => setSelectedTagUserId(e.target.value)}
-                    >
-                      <option value="none">None / 1:1 meeting</option>
-                      {activeSalesReps
-                        .filter((rep) => rep.active)
-                        .map((rep) => (
-                          <option key={rep.id} value={rep.id}>
-                            {rep.name} — {rep.role} · {rep.region}
-                          </option>
-                        ))}
-                    </select>
+                  <div className="sellerSearchBox">
+  <input
+    value={sellerSearch}
+    onChange={(e) => {
+      setSellerSearch(e.target.value);
+      setSelectedTagUserId("none");
+    }}
+    placeholder="Search sellers by name, email, team, or region"
+  />
 
-                    <button onClick={tagSelectedTeammate}>
-                      Add teammate tag
-                    </button>
-                  </div>
-                </div>
+  {usersError && <p className="errorText">{usersError}</p>}
+
+  {sellerSearch && filteredSalesReps.length > 0 && (
+    <div className="sellerResults">
+      {filteredSalesReps.slice(0, 8).map((rep) => (
+        <button
+          key={rep.id}
+          className={
+            selectedTagUserId === rep.id
+              ? "sellerResult active"
+              : "sellerResult"
+          }
+          onClick={() => setSelectedTagUserId(rep.id)}
+        >
+          <div className="avatar">{getInitials(rep.name)}</div>
+          <div>
+            <strong>{rep.name}</strong>
+            <span>
+              {rep.role || "Seller"} · {rep.team || "Sales"} ·{" "}
+              {rep.region || "No region"}
+            </span>
+            <small>{rep.email}</small>
+          </div>
+        </button>
+      ))}
+    </div>
+  )}
+
+  {sellerSearch && filteredSalesReps.length === 0 && (
+    <p className="empty">No sellers found.</p>
+  )}
+
+  <button
+    onClick={tagSelectedTeammate}
+    disabled={selectedTagUserId === "none"}
+  >
+    Add selected seller tag
+  </button>
+</div>
+</div>
 
                 <div className="buttonGrid">
                   <button onClick={saveNote}>Save as note</button>
