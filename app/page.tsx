@@ -476,14 +476,6 @@ const filteredEvents = events.filter((event) => {
     (contact) => contact.addedByUserId === currentUser.id
   );
 
-  const contactsAddedByUser = eventContacts.reduce<Record<string, number>>(
-    (acc, contact) => {
-      acc[contact.addedByUserId] = (acc[contact.addedByUserId] || 0) + 1;
-      return acc;
-    },
-    {}
-  );
-
   function updateSelectedContact(updatedContact: Contact) {
     setContacts(
       contacts.map((contact) =>
@@ -1375,37 +1367,31 @@ ${draft.body}`;
               </div>
 
               <div className="emailDraftBox">
-                <div>
-                  <strong>Follow-up email</strong>
-                  <p>
-                    Draft a follow-up to {selected.email || "this contact"}. Copy it into
-                    Gmail/Outlook for now, then mark it sent and paste the Salesforce/Weflow
-                    link when available.
-                  </p>
-                </div>
+               <div className="emailDraftHeaderBlock">
+  <div>
+    <strong>Follow-up email</strong>
+    <p>{selected.email ? selected.email : "No email available"}</p>
+  </div>
 
-                <div className="emailMeta">
-                  <span>To: {selected.email || "No email available"}</span>
-                </div>
-
-                <button onClick={generateFollowUpDraft} disabled={!selected.email}>
-                  Generate draft
-                </button>
+  <button onClick={generateFollowUpDraft} disabled={!selected.email}>
+    Generate draft
+  </button>
+</div>
 
                 <input
                   value={draftSubject}
                   onChange={(e) => setDraftSubject(e.target.value)}
-                  placeholder="Email subject"
+                  placeholder="Subject"
                 />
 
                 <textarea
                   value={draftBody}
                   onChange={(e) => setDraftBody(e.target.value)}
-                  placeholder="Email body"
+                  placeholder="Write or generate the email body..."
                 />
 
                 <button onClick={saveEmailDraft} disabled={!selected.email}>
-                  Save email draft
+                  Save Draft
                 </button>
               </div>
 
@@ -1553,51 +1539,6 @@ ${draft.body}`;
                       </div>
                     </div>
                   ))}
-                </div>
-
-                <div>
-                  <h3>Who is meeting with whom?</h3>
-                  <div className="relationshipList">
-                    {Object.entries(contactsAddedByUser).length === 0 && (
-                      <p className="empty">No contacts added for this event yet.</p>
-                    )}
-
-                    {Object.entries(contactsAddedByUser).map(([userId, count]) => (
-                      <div key={userId} className="relationshipRow">
-                        <strong>{getUserName(userId, allUsers)}</strong>
-                        <span>
-                          added {count} contact{count === 1 ? "" : "s"} to{" "}
-                          {selectedEvent?.name || "this event"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h3>Reporting preview</h3>
-                  <div className="reportGrid">
-                    <div>
-                      <span>Event</span>
-                      <strong>{selectedEvent?.name || "N/A"}</strong>
-                    </div>
-                    <div>
-                      <span>Contacts</span>
-                      <strong>{eventContacts.length}</strong>
-                    </div>
-                    <div>
-                      <span>Unique accounts</span>
-                      <strong>{uniqueAccounts}</strong>
-                    </div>
-                    <div>
-                      <span>Follow-ups</span>
-                      <strong>{eventFollowups}</strong>
-                    </div>
-                    <div>
-                      <span>Team tags</span>
-                      <strong>{eventTags}</strong>
-                    </div>
-                  </div>
                 </div>
               </div>
             </>
